@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://gursimarpreetsingh-coder.github.io/Relec/"><img src="https://img.shields.io/badge/🌐_Live_Web_App-Always_Active-0284c7?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Live Website" /></a>
-  <a href="https://gursimarpreetsingh-coder.github.io/Relec/downloads/relec-pro-erp.apk"><img src="https://img.shields.io/badge/📱_Download_Android_APK-Direct_Install-10b981?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
-  <a href="https://github.com/GursimarpreetSingh-coder/Relec/actions"><img src="https://img.shields.io/badge/🚀_CI%2FCD-GitHub_Pages_Automated-8b5cf6?style=for-the-badge&logo=github-actions&logoColor=white" alt="GitHub Actions" /></a>
-  <a href="https://github.com/GursimarpreetSingh-coder/Relec"><img src="https://img.shields.io/badge/⚡_Architecture-Android_Native_%2B_React_18_PWA-ef4444?style=for-the-badge" alt="Stack" /></a>
+  <a href="https://gursimarpreetsingh-coder.github.io/relec-web-ui/"><img src="https://img.shields.io/badge/🌐_Live_Web_App-Always_Active-0284c7?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Live Website" /></a>
+  <a href="https://gursimarpreetsingh-coder.github.io/relec-web-ui/downloads/relec-pro-erp.apk"><img src="https://img.shields.io/badge/📱_Download_Android_APK-Direct_Install-10b981?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+  <a href="https://github.com/GursimarpreetSingh-coder/relec-web-ui/actions"><img src="https://img.shields.io/badge/🚀_CI%2FCD-GitHub_Pages_Automated-8b5cf6?style=for-the-badge&logo=github-actions&logoColor=white" alt="GitHub Actions" /></a>
+  <a href="https://github.com/GursimarpreetSingh-coder/relec-web-ui"><img src="https://img.shields.io/badge/⚡_Architecture-Android_Native_%2B_React_18_PWA-ef4444?style=for-the-badge" alt="Stack" /></a>
 </p>
 
 ---
@@ -22,10 +22,10 @@
 
 | Resource | Link | Description |
 | :--- | :--- | :--- |
-| **🌐 Live Production Website** | [**Launch Web Portal**](https://gursimarpreetsingh-coder.github.io/Relec/) | Permanent, responsive web app with 100% feature parity |
-| **📱 Android Mobile App (APK)** | [**Download `relec-pro-erp.apk`**](https://gursimarpreetsingh-coder.github.io/Relec/downloads/relec-pro-erp.apk) | Direct APK download for Android phones & tablets (v1.0) |
-| **🎫 Customer Public Desk** | [**Open Customer Desk**](https://gursimarpreetsingh-coder.github.io/Relec/?view=customer) | Zero-barrier portal for customer ticket booking & tracking |
-| **📂 Source Code Repository** | [**GitHub: GursimarpreetSingh-coder/Relec**](https://github.com/GursimarpreetSingh-coder/Relec) | Complete Android Native (Kotlin) + React 18 Web ERP |
+| **🌐 Live Production Website** | [**Launch Web Portal**](https://gursimarpreetsingh-coder.github.io/relec-web-ui/) | Permanent, responsive web app with 100% feature parity |
+| **📱 Android Mobile App (APK)** | [**Download `relec-pro-erp.apk`**](https://gursimarpreetsingh-coder.github.io/relec-web-ui/downloads/relec-pro-erp.apk) | Direct APK download for Android phones & tablets (v1.0) |
+| **🎫 Customer Public Desk** | [**Open Customer Desk**](https://gursimarpreetsingh-coder.github.io/relec-web-ui/?view=customer) | Zero-barrier portal for customer ticket booking & tracking |
+| **📂 Source Code Repository** | [**GitHub: GursimarpreetSingh-coder/relec-web-ui**](https://github.com/GursimarpreetSingh-coder/relec-web-ui) | Complete Android Native (Kotlin) + React 18 Web ERP |
 
 ---
 
@@ -154,16 +154,15 @@ The generated APK is located at:
 
 ## 🚢 Continuous Deployment (GitHub Pages)
 
-Every push to the `main` branch automatically triggers the GitHub Actions workflow in `.github/workflows/deploy.yml`:
+Every push to the `master` branch automatically triggers the GitHub Actions workflow in `.github/workflows/deploy.yml`:
 1. Checks out the code and sets up Node.js 20.
 2. Installs dependencies and runs `npm run build` in `/web`.
 3. Deploys the compiled static website directly to GitHub Pages.
 
 **Production Deployment URL:**
-👉 [https://gursimarpreetsingh-coder.github.io/Relec/](https://gursimarpreetsingh-coder.github.io/Relec/)
+👉 [https://gursimarpreetsingh-coder.github.io/relec-web-ui/](https://gursimarpreetsingh-coder.github.io/relec-web-ui/)
 
 ---
 
 ## 📄 License & Ownership
 Copyright © 2026 **Gursimar Singh** & **Rattan Electricals Enterprise Traders**. All rights reserved.
-Developed with Google DeepMind Advanced Agentic Coding.
