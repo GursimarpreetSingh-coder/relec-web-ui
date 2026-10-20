@@ -1,0 +1,11 @@
+{
+  "name": "relec-pro-erp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ReLec PRO ERP & RE-VOLT Enterprise Web Platform for Rattan Electricals",
+  "scripts": {
+    "dev": "npm --prefix web run dev",
+    "build": "npm --prefix web run build",
+    "preview": "npm --prefix web run preview"
+  }
+}

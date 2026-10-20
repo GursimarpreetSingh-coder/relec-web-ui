@@ -1,0 +1,6 @@
+{
+  "name": "ReLec",
+  "description": "Premium electrical business ERP with real-time analytics, inventory voice controls, and customer service portals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
