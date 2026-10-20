@@ -37,9 +37,9 @@ fun BrandLogoView(
         )
     } else {
         val defaultDrawable = if (isRevolt) {
-            R.drawable.img_revolt_red_logo_1791094396822
+            R.drawable.revolt_red_logo_official
         } else {
-            R.drawable.img_relec_blue_logo_1791094376351
+            R.drawable.relec_blue_logo_official
         }
         Image(
             painter = painterResource(id = defaultDrawable),

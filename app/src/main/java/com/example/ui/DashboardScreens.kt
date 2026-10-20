@@ -566,7 +566,7 @@ fun SidebarContent(
             ) {
                 Image(
                     painter = painterResource(
-                        id = if (isRevoltTheme) R.drawable.img_revolt_red_logo_1791094396822 else R.drawable.img_relec_blue_logo_1791094376351
+                        id = if (isRevoltTheme) R.drawable.revolt_red_logo_official else R.drawable.relec_blue_logo_official
                     ),
                     contentDescription = "Brand Logo",
                     modifier = Modifier
