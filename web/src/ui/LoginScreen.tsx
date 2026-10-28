@@ -20,7 +20,10 @@ import {
   KeyRound,
   RotateCcw,
   Download,
-  X
+  X,
+  Layers,
+  Database,
+  Zap
 } from 'lucide-react';
 
 interface LoginScreenProps {
@@ -507,8 +510,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     color: accentColor
                   }}
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>⚡ 1-Click Master Admin Instant Login</span>
+                  <Zap className="w-4 h-4" />
+                  <span>Master Admin Instant Access</span>
                 </button>
 
                 <div className="flex justify-center">
@@ -802,17 +805,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               type="button"
               onClick={() => handleEnterSandbox(false)}
               disabled={isLoading}
-              className="py-2 px-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-all flex items-center justify-center gap-1"
+              className="py-2 px-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
             >
-              <span>🚀 Clean Sandbox</span>
+              <Layers className="w-3.5 h-3.5" />
+              <span>Clean Sandbox</span>
             </button>
             <button
               type="button"
               onClick={() => handleEnterSandbox(true)}
               disabled={isLoading}
-              className="py-2 px-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-bold transition-all flex items-center justify-center gap-1"
+              className="py-2 px-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
             >
-              <span>📦 Sample Data</span>
+              <Database className="w-3.5 h-3.5" />
+              <span>Sample Dataset</span>
             </button>
           </div>
         </div>

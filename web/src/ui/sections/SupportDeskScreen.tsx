@@ -15,7 +15,8 @@ import {
   Save,
   CheckCircle,
   ExternalLink,
-  ShieldAlert
+  ShieldAlert,
+  X
 } from 'lucide-react';
 
 export const SupportDeskScreen: React.FC = () => {
@@ -259,7 +260,7 @@ export const SupportDeskScreen: React.FC = () => {
               onClick={() => setShowStandeeModal(false)}
               className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-100 text-slate-400 print:hidden"
             >
-              ✕
+              <X className="w-5 h-5" />
             </button>
 
             {/* Standee Content */}

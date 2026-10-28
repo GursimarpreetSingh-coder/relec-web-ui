@@ -327,7 +327,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onLogout }) => {
               style={{ backgroundColor: accentColor }}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${syncInProgress ? 'animate-spin' : ''}`} />
-              <span>{syncInProgress ? 'Synchronizing Cloud...' : '⚡ Sync Cloud Ledger Now'}</span>
+              <span>{syncInProgress ? 'Synchronizing Cloud...' : 'Sync Cloud Ledger Now'}</span>
             </button>
 
             {syncState.lastSyncTime && (

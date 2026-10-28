@@ -25,7 +25,10 @@ import {
   ShieldCheck,
   ChevronRight,
   Printer,
-  Download
+  Download,
+  Check,
+  X,
+  UserCheck
 } from 'lucide-react';
 
 interface CustomerPublicPortalProps {
@@ -270,7 +273,9 @@ export const CustomerPublicPortal: React.FC<CustomerPublicPortalProps> = ({
               <CheckCircle className="w-4 h-4" />
               <span>{bookingSuccessMsg}</span>
             </div>
-            <button onClick={() => setBookingSuccessMsg('')} className="text-slate-400 hover:text-white">✕</button>
+            <button onClick={() => setBookingSuccessMsg('')} className="p-0.5 text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
@@ -362,7 +367,7 @@ export const CustomerPublicPortal: React.FC<CustomerPublicPortalProps> = ({
                               <div
                                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black transition-all ${isDone ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30' : 'bg-slate-800 text-slate-500'}`}
                               >
-                                {isDone ? '✓' : idx + 1}
+                                {isDone ? <Check className="w-3.5 h-3.5" /> : idx + 1}
                               </div>
                               <span className={`text-[10px] font-bold mt-1 ${isCurrent ? 'text-emerald-400' : isDone ? 'text-slate-300' : 'text-slate-600'}`}>
                                 {st}
@@ -384,8 +389,15 @@ export const CustomerPublicPortal: React.FC<CustomerPublicPortalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-500 block">Assigned Technician</span>
-                        <p className="font-extrabold text-slate-200 mt-0.5">
-                          {job.assignedWorkerName ? `⚡ ${job.assignedWorkerName} (Rattan Electricals)` : 'Searching nearest available electrician...'}
+                        <p className="font-extrabold text-slate-200 mt-0.5 flex items-center gap-1.5">
+                          {job.assignedWorkerName ? (
+                            <>
+                              <UserCheck className="w-3.5 h-3.5 text-blue-400" />
+                              <span>{job.assignedWorkerName} (Rattan Electricals)</span>
+                            </>
+                          ) : (
+                            'Searching nearest available electrician...'
+                          )}
                         </p>
                       </div>
                       <div>
