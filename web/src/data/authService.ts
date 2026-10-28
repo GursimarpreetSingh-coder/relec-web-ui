@@ -1,4 +1,5 @@
-import { db, hashPasswordWithSalt, initializeDatabase, resetMasterAdminPassword } from './database';
+import { db, hashPasswordWithSalt, initializeDatabase, resetMasterAdminPassword, initializeSandboxDatabase } from './database';
+import { cloudSyncService } from './cloudSyncService';
 import type { UserEntity, UserSession, OtpRecord, AuditLogEntry, Customer } from '../types/models';
 
 export interface AuthResult {
@@ -227,6 +228,12 @@ class AuthService {
       }
 
       const normalizedRole = user.role;
+      const isProduction = user.isApproved && (user.role === 'Admin' || user.role === 'Worker');
+      if (isProduction) {
+        cloudSyncService.setMode('production');
+        cloudSyncService.syncNow().catch(() => {});
+      }
+
       const session: UserSession = {
         uid: user.id,
         email: user.email || '',
@@ -236,7 +243,9 @@ class AuthService {
         isApproved: user.isApproved,
         isActive: user.isActive,
         token: Math.random().toString(36).substring(2) + Date.now().toString(36),
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        isGuestSandbox: false,
+        mode: isProduction ? 'production' : 'sandbox'
       };
 
       this.saveSession(session);
@@ -594,7 +603,7 @@ class AuthService {
     return { success: true, message: 'Password updated successfully. You can now sign in.' };
   }
 
-  // Instant 1-Click Master Admin Login
+  // Instant 1-Click Master Admin Login (Production Mode)
   public async instantMasterAdminLogin(): Promise<AuthResult> {
     await initializeDatabase();
     let master = await db.users.get('ADMIN_MASTER_GURSIMAR');
@@ -612,6 +621,10 @@ class AuthService {
       isApproved: true
     });
 
+    // Production mode sync
+    cloudSyncService.setMode('production');
+    cloudSyncService.syncNow().catch(() => {});
+
     const session: UserSession = {
       uid: master.id,
       email: master.email || 'gursimarpsr@gmail.com',
@@ -621,11 +634,39 @@ class AuthService {
       isApproved: true,
       isActive: true,
       token: Math.random().toString(36).substring(2) + Date.now().toString(36),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      isGuestSandbox: false,
+      mode: 'production'
     };
 
     this.saveSession(session);
     return { success: true, session };
+  }
+
+  // Guest Sandbox Login (For GitHub Visitors & Demos)
+  public async loginAsGuestSandbox(loadSample = false): Promise<AuthResult> {
+    await initializeDatabase();
+    await initializeSandboxDatabase(loadSample);
+
+    cloudSyncService.setMode('sandbox');
+
+    const guestSession: UserSession = {
+      uid: 'GUEST_SANDBOX_' + Date.now().toString(36),
+      email: 'guest@github.visitor',
+      phone: '9999999999',
+      displayName: 'GitHub Guest Explorer',
+      role: 'Admin',
+      isApproved: true,
+      isActive: true,
+      token: 'SANDBOX_' + Math.random().toString(36).substring(2),
+      createdAt: new Date().toISOString(),
+      isGuestSandbox: true,
+      mode: 'sandbox'
+    };
+
+    this.saveSession(guestSession);
+    await this.logAudit('SANDBOX_ENTRY', 'Public visitor entered isolated sandbox mode', guestSession.uid, guestSession.displayName);
+    return { success: true, session: guestSession };
   }
 
   // Update Master Admin password directly

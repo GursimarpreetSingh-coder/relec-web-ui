@@ -282,14 +282,30 @@ export async function initializeDatabase() {
   if (!existingSupport) {
     await db.settings.put({ key: 'storeSupportInfo', value: DEFAULT_SUPPORT_INFO });
   }
+}
 
-  // One-time automatic purge of legacy mock data so the app starts clean & authentic
-  const hasPurgedLegacy = localStorage.getItem('has_purged_mock_v3') === 'true';
-  if (!hasPurgedLegacy) {
-    localStorage.setItem('has_purged_mock_v3', 'true');
-    localStorage.setItem('is_toy_data_cleared', 'true');
-    await clearAllToyData();
-  }
+export async function initializeSandboxDatabase(loadSampleData = false) {
+  await db.transaction('rw', [db.customers, db.services, db.workers, db.inventory, db.purchases, db.bills, db.expenses, db.attendance], async () => {
+    await db.customers.clear();
+    await db.services.clear();
+    await db.workers.clear();
+    await db.inventory.clear();
+    await db.purchases.clear();
+    await db.bills.clear();
+    await db.expenses.clear();
+    await db.attendance.clear();
+
+    if (loadSampleData) {
+      await db.customers.bulkPut(SEED_CUSTOMERS);
+      await db.services.bulkPut(SEED_SERVICES);
+      await db.workers.bulkPut(SEED_WORKERS);
+      await db.inventory.bulkPut(SEED_INVENTORY);
+      await db.purchases.bulkPut(SEED_PURCHASES);
+      await db.bills.bulkPut(SEED_BILLS);
+      await db.expenses.bulkPut(SEED_EXPENSES);
+      await db.attendance.bulkPut(SEED_ATTENDANCE);
+    }
+  });
 }
 
 // --- Data Management Operations ---

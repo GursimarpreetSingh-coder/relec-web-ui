@@ -120,6 +120,20 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
   };
 
+  // Guest Sandbox Login for GitHub Visitors
+  const handleEnterSandbox = async (loadSample: boolean) => {
+    clearMessages();
+    setIsLoading(true);
+    const result = await authService.loginAsGuestSandbox(loadSample);
+    setIsLoading(false);
+
+    if (result.success && result.session) {
+      onLoginSuccess('Admin', result.session);
+    } else {
+      setErrorMsg(result.error || 'Failed to enter sandbox mode.');
+    }
+  };
+
   // Set / Reset Admin Password Directly
   const [showAdminResetModal, setShowAdminResetModal] = useState(false);
   const [newAdminPasswordInput, setNewAdminPasswordInput] = useState('');
@@ -773,6 +787,35 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             )}
           </form>
         )}
+
+        {/* Public GitHub Visitor Sandbox Card */}
+        <div className={`mt-5 p-3.5 rounded-2xl border text-center transition-all ${isDarkTheme ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+          <div className="flex items-center justify-center gap-1.5 mb-1 text-[11px] font-black uppercase tracking-wider text-amber-500">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>GitHub Visitor Demo Sandbox</span>
+          </div>
+          <p className="text-[11px] text-slate-500 mb-3 leading-tight">
+            Visiting from GitHub? Test the entire ERP in an isolated sandbox. The store owner's live production database is secure and protected.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleEnterSandbox(false)}
+              disabled={isLoading}
+              className="py-2 px-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 text-xs font-bold transition-all flex items-center justify-center gap-1"
+            >
+              <span>🚀 Clean Sandbox</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleEnterSandbox(true)}
+              disabled={isLoading}
+              className="py-2 px-2.5 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 text-xs font-bold transition-all flex items-center justify-center gap-1"
+            >
+              <span>📦 Sample Data</span>
+            </button>
+          </div>
+        </div>
 
         {/* Footer Toggle between Modes */}
         <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800/80 text-center text-xs text-slate-500">

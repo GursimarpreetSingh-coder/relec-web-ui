@@ -240,4 +240,6 @@ export interface UserSession {
   isActive: boolean;
   token: string;
   createdAt: string;
+  isGuestSandbox?: boolean;
+  mode?: 'production' | 'sandbox';
 }

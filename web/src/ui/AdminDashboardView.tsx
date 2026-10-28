@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from './theme';
+import { authService } from '../data/authService';
+import { cloudSyncService, type CloudSyncState } from '../data/cloudSyncService';
 import { DashboardScreen } from './sections/DashboardScreen';
 import { CustomersScreen } from './sections/CustomersScreen';
 import { ServicesScreen } from './sections/ServicesScreen';
@@ -31,7 +33,9 @@ import {
   ShieldCheck,
   Settings,
   X,
-  Download
+  Download,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 
 interface AdminDashboardViewProps {
@@ -53,6 +57,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onLogout
   const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
   const [showVoiceModal, setShowVoiceModal] = useState<boolean>(false);
 
+  const currentSession = authService.getCurrentSession();
+  const isGuestSandbox = currentSession?.isGuestSandbox || currentSession?.mode === 'sandbox';
+
+  const [syncState, setSyncState] = useState<CloudSyncState>(cloudSyncService.getState());
+  const [syncNotification, setSyncNotification] = useState<string>('');
+
+  useEffect(() => {
+    return cloudSyncService.subscribe((state) => {
+      setSyncState(state);
+    });
+  }, []);
+
+  const handleManualSync = async () => {
+    const res = await cloudSyncService.syncNow();
+    setSyncNotification(res.message);
+    setTimeout(() => setSyncNotification(''), 4000);
+  };
+
   // More menu items
   const moreModules = [
     { label: 'Workers & Electricians', icon: Users, section: 'Workers' },
@@ -66,12 +88,38 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onLogout
 
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-300 ${isDarkTheme ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      {/* Top Application Bar */}
-      <header className={`sticky top-0 z-40 px-4 sm:px-6 py-3 border-b backdrop-blur-xl flex items-center justify-between transition-colors ${isDarkTheme ? 'bg-slate-950/85 border-slate-800/80 shadow-md' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
+      {/* Sandbox / Production Security Notice Bar */}
+      {isGuestSandbox ? (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-xs text-amber-400">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-semibold">
+              <strong>GUEST SANDBOX DEMO:</strong> Real store database is secured by Super Admin. You can freely test all features in this isolated playground.
+            </span>
+          </div>
+          <button
+            onClick={onLogout}
+            className="text-[11px] font-bold underline hover:text-white px-2 py-0.5 rounded bg-amber-500/20"
+          >
+            Switch to Owner Login
+          </button>
+        </div>
+      ) : (
+        <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-4 py-1.5 flex items-center justify-between text-[11px] text-emerald-400 font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>LIVE PRODUCTION CLOUD LEDGER — Synced with Android Mobile App ({currentSession?.displayName || 'Gursimar Singh'})</span>
+          </div>
+          {syncNotification && <span className="text-emerald-300 font-bold">{syncNotification}</span>}
+        </div>
+      )}
+
+      {/* Top Application Bar matching Jetpack Compose */}
+      <header className={`sticky top-0 z-40 px-4 sm:px-6 py-2.5 border-b backdrop-blur-xl flex items-center justify-between transition-colors ${isDarkTheme ? 'bg-slate-950/85 border-slate-800/80 shadow-md' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
         {/* Brand Logo & Title */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <div
-            className="w-10 h-10 rounded-xl p-0.5 border flex items-center justify-center overflow-hidden shrink-0 shadow-sm"
+            className="w-9 h-9 rounded-xl p-0.5 border flex items-center justify-center overflow-hidden shrink-0 shadow-sm"
             style={{
               borderColor: `${accentColor}50`,
               backgroundColor: isRevolt ? 'transparent' : '#FFFFFF'
@@ -81,34 +129,34 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onLogout
           </div>
 
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span className="font-black text-base sm:text-lg tracking-tight leading-none">
                 {brandName}
               </span>
               <span
-                className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider text-white"
+                className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider text-white"
                 style={{ backgroundColor: accentColor }}
               >
                 PRO ADMIN
               </span>
             </div>
-            <p className="text-[11px] font-semibold text-slate-500 tracking-wide mt-0.5">
+            <p className="text-[10px] font-semibold text-slate-500 tracking-wide mt-0.5">
               Rattan Electricals
             </p>
           </div>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls matching Android size 30dp square buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Mobile APK Download Button */}
-          <a
-            href="./downloads/relec-pro-erp.apk"
-            download="relec-pro-erp.apk"
-            className="p-2 rounded-xl border transition-all bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20"
-            title="Download Android Mobile App (APK)"
+          {/* Cloud Sync Button */}
+          <button
+            onClick={handleManualSync}
+            disabled={syncState.isSyncing}
+            className={`p-2 rounded-xl border transition-all ${isDarkTheme ? 'bg-slate-900 border-slate-800 text-blue-400 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-blue-600 hover:bg-slate-200'}`}
+            title={syncState.lastSyncTime ? `Last synced: ${syncState.lastSyncTime}. Click to sync with Mobile App.` : 'Sync with Mobile App & Cloud Ledger'}
           >
-            <Download className="w-4 h-4" />
-          </a>
+            <RefreshCw className={`w-3.5 h-3.5 ${syncState.isSyncing ? 'animate-spin text-emerald-400' : ''}`} />
+          </button>
 
           {/* AI Scanner Button */}
           <button
@@ -116,7 +164,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onLogout
             className={`p-2 rounded-xl border transition-all ${isDarkTheme ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200'}`}
             title="Scan Object or Invoice with AI"
           >
-            <Scan className="w-4 h-4" />
+            <Scan className="w-3.5 h-3.5" />
           </button>
 
           {/* AI Speech Desk Button */}
@@ -125,25 +173,35 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onLogout
             className={`p-2 rounded-xl border transition-all ${isDarkTheme ? 'bg-slate-900 border-slate-800 text-red-400 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-red-600 hover:bg-slate-200'}`}
             title="Speech Voice Command Desk"
           >
-            <Mic className="w-4 h-4" />
+            <Mic className="w-3.5 h-3.5" />
           </button>
+
+          {/* Mobile APK Download Button */}
+          <a
+            href="./downloads/relec-pro-erp.apk"
+            download="relec-pro-erp.apk"
+            className="p-2 rounded-xl border transition-all bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20"
+            title="Download Android Mobile App (APK)"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </a>
 
           {/* Theme Toggle */}
           <button
             onClick={toggleDarkTheme}
-            className={`p-2 rounded-xl border transition-all ${isDarkTheme ? 'bg-slate-900 border-slate-800 text-blue-400 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-blue-600 hover:bg-slate-200'}`}
+            className={`p-2 rounded-xl border transition-all ${isDarkTheme ? 'bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200'}`}
             title="Toggle Dark/Light Mode"
           >
-            {isDarkTheme ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDarkTheme ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
           </button>
 
           {/* Logout Button */}
           <button
             onClick={onLogout}
-            className="p-2 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all ml-1"
+            className="p-2 rounded-xl border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all ml-0.5"
             title="Sign Out"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
@@ -182,14 +240,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onLogout
             <span className="text-[10px]">Dashboard</span>
           </button>
 
-          {/* 2. Services */}
+          {/* 2. Jobs (Services) */}
           <button
             onClick={() => setCurrentSection('Services')}
             className={`flex flex-col items-center justify-center py-1 rounded-xl transition-all ${currentSection === 'Services' ? 'font-extrabold' : 'text-slate-500 hover:text-slate-300'}`}
             style={{ color: currentSection === 'Services' ? accentColor : undefined }}
           >
             <Wrench className="w-4 h-4 mb-1" />
-            <span className="text-[10px]">Services</span>
+            <span className="text-[10px]">Jobs</span>
           </button>
 
           {/* 3. Customers */}

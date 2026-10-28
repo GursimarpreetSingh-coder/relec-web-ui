@@ -418,10 +418,15 @@ class ReLectRepository private constructor(context: Context) {
 
     private fun triggerSync() {
         _isSyncing.value = true
-        // Quick background reset
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            _isSyncing.value = false
-        }, 1200)
+        repositoryScope.launch {
+            try {
+                CloudSyncManager.syncWithCloud(context, dao, true)
+            } catch (e: Exception) {
+                // Background sync silent fail-safe
+            } finally {
+                _isSyncing.value = false
+            }
+        }
     }
 
     fun setFirestoreProject(name: String) {
