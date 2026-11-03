@@ -23,7 +23,7 @@
 | Resource | Link | Description |
 | :--- | :--- | :--- |
 | **Live Production Website** | [**Launch Web Portal**](https://gursimarpreetsingh-coder.github.io/relec-web-ui/) | Permanent, responsive web app with 100% feature parity |
-| **Android Mobile App (APK)** | [**Download `relec-pro-erp.apk`**](https://gursimarpreetsingh-coder.github.io/relec-web-ui/downloads/relec-pro-erp.apk) | Direct APK download for Android phones & tablets (v1.0) |
+| **Android Mobile App (APK)** | [**Download `relec-pro-erp.apk`**](https://gursimarpreetsingh-coder.github.io/relec-web-ui/downloads/relec-pro-erp.apk) | Direct APK download for Android phones & tablets (v1.2) |
 | **Customer Public Desk** | [**Open Customer Desk**](https://gursimarpreetsingh-coder.github.io/relec-web-ui/?view=customer) | Zero-barrier portal for customer ticket booking & tracking |
 | **Source Code Repository** | [**GitHub: GursimarpreetSingh-coder/relec-web-ui**](https://github.com/GursimarpreetSingh-coder/relec-web-ui) | Complete Android Native (Kotlin) + React 18 Web ERP |
 
@@ -46,16 +46,18 @@ ReLec features an advanced **Dual-Brand Dynamic Switcher** allowing business ope
 ## Key Features & Architectural Capabilities
 
 ### 1. Role-Based Access Control (RBAC) & Authentication
-- **Master Admin (`gursimarpsr@gmail.com` / `9872134590`):**
+- **Master Admin:**
   - Full biometric and salted SHA-256 cryptographic credential verification.
-  - **Master Admin Instant Login** for seamless, zero-friction administrative access.
+  - **Master Admin Instant Login** for seamless administrative access.
   - In-app **Password Reset & Custom Password Configuration** without lockouts.
-- **Field Technician / Worker Console (`worker@relect.com` / `9821034455`):**
+- **Field Technician / Worker Console:**
   - Technician attendance clock-in/out timestamping with duration tracking.
   - Job acceptance, on-site status progression, and repair notes dispatch.
 - **Customer Desk (Zero-Barrier Access):**
   - Instant mobile phone OTP verification with 6-digit dispatch.
   - Direct QR Standee entry without requiring email or passwords.
+- **Guest Visitor Sandbox:**
+  - Dedicated isolated testing environment for public visitors with clean or sample datasets.
 
 ### 2. Master Administrative Suite (11 Core Modules)
 1. **Executive Dashboard:** Live revenue analytics, active job counts, low inventory flags, duty technician counts, and quick action bar.
@@ -73,7 +75,7 @@ ReLec features an advanced **Dual-Brand Dynamic Switcher** allowing business ope
 ### 3. Multimodal AI & Voice Assistant
 - **Gemini Vision OCR Scanner:** Point the device camera at physical supplier invoices or handwritten bills to instantly extract line items, quantities, and totals.
 - **Electrical Component Detector:** AI visual analysis identifying motor capacitors, MCBs, contactors, relays, and circuit boards.
-- **Multilingual Voice Command Engine:** Supports English, Hindi, and Punjabi voice queries (e.g., *"1.5 HP Submersible motor capacitor ka price check karo"*).
+- **Multilingual Voice Command Engine:** Supports English, Hindi, and Punjabi voice queries.
 
 ### 4. Offline-First Dual Persistence & Real-time Cloud Sync
 - **Android Native:** Room SQLite database with reactive Kotlin Coroutines StateFlow and CloudSyncManager.
@@ -82,14 +84,25 @@ ReLec features an advanced **Dual-Brand Dynamic Switcher** allowing business ope
 
 ---
 
-## Default Credentials & Access Guide
+## Role & Access Overview
 
-| Role | Login Identifier | Default Password | Access Portal |
-| :--- | :--- | :--- | :--- |
-| **Master Admin** | `gursimarpsr@gmail.com` *(or `9872134590`)* | `Admin@123` | Select **Admin** tab -> Enter credentials or click **Master Admin Instant Access** |
-| **Worker / Field Tech** | `worker@relect.com` *(or `9821034455`)* | `Worker@123` | Select **Worker** tab -> Enter credentials |
-| **Customer** | Mobile Number (e.g. `9872134590`) | *6-Digit OTP* | Select **Customer** tab -> Enter phone number & verify OTP |
-| **Guest / Visitor Sandbox** | Any GitHub visitor | *No password required* | Click **Clean Sandbox** or **Sample Dataset** on login card |
+| Role | Access Type | Description |
+| :--- | :--- | :--- |
+| **Master Admin** | Full Administrative Access | Complete store control, ledger reports, billing, inventory & staff management |
+| **Worker / Technician** | Field Service Console | Job ticket management, site attendance, and work completion reports |
+| **Customer** | Self-Service Portal | Direct repair tracking and technician booking via phone number OTP |
+| **Guest Sandbox** | Isolated Demo Environment | Public exploration with clean or sample datasets without touching production records |
+
+---
+
+## Android Mobile App Installation Instructions
+
+If you are downloading and installing the APK directly on your Android phone:
+
+1. **Uninstall Existing Versions:** If a previous build or development version of the app is already on your phone, uninstall it first to prevent signature conflict errors.
+2. **Enable Unknown Sources:** When prompted by your browser or file manager (*"For your security, your phone is not allowed to install unknown apps from this source"*), tap **Settings** and enable **"Allow from this source"**.
+3. **Google Play Protect Notice:** Because this is an in-development build, Google Play Protect may show an *"Unrecognized app developer"* prompt. Tap **"More details"** and select **"Install anyway"**.
+4. **Permissions:** Grant Camera and Notification permissions when requested for the AI bill scanner and service alerts.
 
 ---
 
