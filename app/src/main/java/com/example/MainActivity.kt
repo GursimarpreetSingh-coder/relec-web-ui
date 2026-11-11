@@ -104,6 +104,21 @@ class MainActivity : ComponentActivity() {
                 )
             }
             var isDarkTheme by rememberSaveable { mutableStateOf(false) } // Default to premium light theme
+            var appUpdateInfo by remember { mutableStateOf<com.example.data.AppVersionManifest?>(null) }
+            val currentContext = LocalContext.current
+
+            // Automatic In-App Update Verification: checks live version.json from GitHub Pages
+            LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(2000)
+                try {
+                    val update = com.example.data.AppUpdateManager.checkForUpdates(currentContext)
+                    if (update != null) {
+                        appUpdateInfo = update
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MainActivity", "In-app update check failed: ${e.message}")
+                }
+            }
 
             // Synchronize system status bar & navigation bar contrast dynamically with theme
             DisposableEffect(isDarkTheme, showSplashScreen) {
@@ -338,6 +353,19 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
+                        }
+                        
+                        // In-App Online Update Prompt Dialog for All Logged-in Devices
+                        appUpdateInfo?.let { update ->
+                            com.example.ui.components.AppUpdateDialog(
+                                updateInfo = update,
+                                accentColor = selectedAccentColor,
+                                onDismiss = { appUpdateInfo = null },
+                                onConfirmUpdate = {
+                                    com.example.data.AppUpdateManager.launchUpdateInstall(currentContext, update.apkUrl)
+                                    appUpdateInfo = null
+                                }
+                            )
                         }
                     }
                 }

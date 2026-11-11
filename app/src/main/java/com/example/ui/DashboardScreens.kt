@@ -1,4 +1,4 @@
-package com.example.ui
+﻿package com.example.ui
 
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -9182,6 +9182,9 @@ fun SettingsScreen(
     var isDbMaintenanceExpanded by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isCheckingUpdate by remember { mutableStateOf(false) }
+    var availableUpdateManifest by remember { mutableStateOf<com.example.data.AppVersionManifest?>(null) }
 
     val isLight = MaterialTheme.colorScheme.surface == Color.White
     val textColor = if (isLight) Color(0xFF0F172A) else Color.White
@@ -10454,6 +10457,80 @@ fun SettingsScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Restore Demo", fontWeight = FontWeight.Bold, color = textColor, fontSize = 11.sp)
                             }
+                        }
+                    }
+                }
+            }
+        }
+        // Section 7: App Updates
+        item {
+            if (availableUpdateManifest != null) {
+                com.example.ui.components.AppUpdateDialog(
+                    updateInfo = availableUpdateManifest!!,
+                    accentColor = accentColor,
+                    onDismiss = { availableUpdateManifest = null },
+                    onConfirmUpdate = {
+                        com.example.data.AppUpdateManager.launchUpdateInstall(context, availableUpdateManifest!!.apkUrl)
+                        availableUpdateManifest = null
+                    }
+                )
+            }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, BorderSilver, RoundedCornerShape(16.dp))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(accentColor.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("App Updates", fontWeight = FontWeight.Bold, color = textColor, fontSize = 14.sp)
+                            Text(
+                                "Current: v (Build #)",
+                                fontSize = 11.sp, color = grayText
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            isCheckingUpdate = true
+                            scope.launch {
+                                val update = com.example.data.AppUpdateManager.checkForUpdates(context)
+                                isCheckingUpdate = false
+                                if (update != null) {
+                                    availableUpdateManifest = update
+                                } else {
+                                    android.widget.Toast.makeText(context, "You're on the latest version!", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        enabled = !isCheckingUpdate,
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        if (isCheckingUpdate) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Text("Check Now", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 }
