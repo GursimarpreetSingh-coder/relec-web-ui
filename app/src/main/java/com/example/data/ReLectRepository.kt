@@ -420,7 +420,7 @@ class ReLectRepository private constructor(context: Context) {
         _isSyncing.value = true
         repositoryScope.launch {
             try {
-                CloudSyncManager.syncWithCloud(context, dao, true)
+                appContext?.let { CloudSyncManager.syncWithCloud(it, dao, true) }
             } catch (e: Exception) {
                 // Background sync silent fail-safe
             } finally {

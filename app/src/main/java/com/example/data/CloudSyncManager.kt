@@ -100,19 +100,16 @@ object CloudSyncManager {
                                 val unit = iObj.optString("unit", "pcs")
                                 val minAlert = iObj.optInt("minAlertLevel", 5)
                                 val price = iObj.optDouble("price", 0.0)
-                                val costPrice = iObj.optDouble("costPrice", 0.0)
-                                val brand = iObj.optString("brand", "")
+                                val supplier = iObj.optString("supplierName", iObj.optString("brand", "Supplier"))
                                 dao.insertInventoryItem(
                                     InventoryItem(
                                         id = id,
                                         name = name,
                                         category = category,
                                         stockLevel = stock,
-                                        unit = unit,
                                         minAlertLevel = minAlert,
-                                        price = price,
-                                        costPrice = costPrice,
-                                        brand = brand
+                                        supplierName = supplier.ifBlank { "Supplier" },
+                                        price = price
                                     )
                                 )
                             }

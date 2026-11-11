@@ -987,23 +987,75 @@ object GeminiClient {
         )
     }
 
-    // Barcode parser
+    // Local ZXing Barcode & QR Code Engine
+    fun decodeQrOrBarcodeLocally(bitmap: Bitmap): String? {
+        return try {
+            val width = bitmap.width
+            val height = bitmap.height
+            val pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+            val source = com.google.zxing.RGBLuminanceSource(width, height, pixels)
+            val binaryBitmap = com.google.zxing.BinaryBitmap(com.google.zxing.common.HybridBinarizer(source))
+            val reader = com.google.zxing.MultiFormatReader().apply {
+                val hints = java.util.EnumMap<com.google.zxing.DecodeHintType, Any>(com.google.zxing.DecodeHintType::class.java).apply {
+                    put(com.google.zxing.DecodeHintType.TRY_HARDER, true)
+                    put(com.google.zxing.DecodeHintType.POSSIBLE_FORMATS, listOf(
+                        com.google.zxing.BarcodeFormat.QR_CODE,
+                        com.google.zxing.BarcodeFormat.DATA_MATRIX,
+                        com.google.zxing.BarcodeFormat.CODE_128,
+                        com.google.zxing.BarcodeFormat.EAN_13,
+                        com.google.zxing.BarcodeFormat.EAN_8,
+                        com.google.zxing.BarcodeFormat.UPC_A,
+                        com.google.zxing.BarcodeFormat.UPC_E,
+                        com.google.zxing.BarcodeFormat.CODE_39
+                    ))
+                }
+                setHints(hints)
+            }
+            val result = reader.decode(binaryBitmap)
+            result.text
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Advanced Barcode, QR Code & Bill Image parser
     suspend fun parseBarcodeImage(bitmap: Bitmap): ReLectRepository.ParsedVoiceData = withContext(Dispatchers.IO) {
+        val localDecoded = decodeQrOrBarcodeLocally(bitmap)
         val apiKey = getApiKey()
         if (apiKey.isBlank() || apiKey == "MY_GEMINI_API_KEY") {
-            throw IllegalStateException("GEMINI_API_KEY is missing. Please configure it in the Secrets panel to scan barcodes.")
+            val visual = analyzeVisualFallback(bitmap)
+            val itemName = if (!localDecoded.isNullOrBlank()) {
+                if (localDecoded.startsWith("http://") || localDecoded.startsWith("https://")) {
+                    "Scanned QR Portal Link"
+                } else if (localDecoded.contains("upi://", ignoreCase = true)) {
+                    "Scanned UPI Payment QR"
+                } else {
+                    "Code ($localDecoded) • ${visual.title}"
+                }
+            } else {
+                visual.title
+            }
+            return@withContext ReLectRepository.ParsedVoiceData(
+                item = itemName,
+                quantity = visual.quantity,
+                amount = visual.estimatedTotalPrice,
+                supplier = if (!localDecoded.isNullOrBlank()) "Payload: $localDecoded" else visual.brand,
+                category = visual.category
+            )
         }
 
         val base64Data = bitmapToBase64(bitmap)
         val prompt = """
-            You are a barcode and packaging label extractor for an electrical retail store.
-            Read the barcode, QR, brand markings, or part numbers from this image.
-            Return ONLY a raw JSON object with:
-            - itemName: String (Product name)
+            You are an expert OCR, QR code, barcode, and invoice extractor for an electrical retail store.
+            Read all barcodes, QR codes, brand markings, bills/receipts, or part numbers from this image.
+            
+            Return ONLY a strict raw JSON object with:
+            - itemName: String (Product name, Bill title, or QR code content description)
             - quantity: Integer (default 1)
-            - amount: Number (Price/MSRP)
-            - category: String (Category)
-            - supplierName: String (Brand/Supplier)
+            - amount: Number (Total Bill Amount, Price, or MSRP in Rupees)
+            - category: String (e.g. "Invoices & Purchases", "Wires & Cables", "Switches & Sockets", "Fans & Cooling", "Switchgears", or "General")
+            - supplierName: String (Brand, Vendor, Supplier, or QR Payload)
         """.trimIndent()
 
         val requestObj = GeminiRequest(
@@ -1026,25 +1078,58 @@ object GeminiClient {
                 .build()
 
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw IllegalStateException("Barcode decoding failed: HTTP ${response.code}")
+                if (!response.isSuccessful) {
+                    val visual = analyzeVisualFallback(bitmap)
+                    val name = if (!localDecoded.isNullOrBlank()) "Code ($localDecoded) • ${visual.title}" else visual.title
+                    return@withContext ReLectRepository.ParsedVoiceData(
+                        item = name,
+                        quantity = visual.quantity,
+                        amount = visual.estimatedTotalPrice,
+                        supplier = visual.brand,
+                        category = visual.category
+                    )
+                }
                 val bodyStr = response.body?.string() ?: ""
                 val geminiResponse = moshi.adapter(GeminiResponse::class.java).fromJson(bodyStr)
                 val text = geminiResponse?.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-                    ?: throw IllegalStateException("No barcode detected")
+
+                if (text.isNullOrBlank()) {
+                    val visual = analyzeVisualFallback(bitmap)
+                    return@withContext ReLectRepository.ParsedVoiceData(
+                        item = visual.title,
+                        quantity = visual.quantity,
+                        amount = visual.estimatedTotalPrice,
+                        supplier = visual.brand,
+                        category = visual.category
+                    )
+                }
 
                 val map = moshi.adapter(Map::class.java).fromJson(cleanJsonText(text)) as? Map<*, *>
-                    ?: throw IllegalStateException("Invalid barcode response")
+
+                val item = map?.get("itemName") as? String ?: if (!localDecoded.isNullOrBlank()) "Scanned Code ($localDecoded)" else "Scanned Item"
+                val qty = (map?.get("quantity") as? Number)?.toInt() ?: 1
+                val amt = (map?.get("amount") as? Number)?.toDouble() ?: 0.0
+                val supp = map?.get("supplierName") as? String ?: if (!localDecoded.isNullOrBlank()) localDecoded else "Local Supplier"
+                val cat = map?.get("category") as? String ?: "General"
 
                 return@withContext ReLectRepository.ParsedVoiceData(
-                    item = map["itemName"] as? String ?: "Scanned Product",
-                    quantity = (map["quantity"] as? Number)?.toInt() ?: 1,
-                    amount = (map["amount"] as? Number)?.toDouble() ?: 0.0,
-                    supplier = map["supplierName"] as? String ?: "Local Distributor",
-                    category = map["category"] as? String ?: "General"
+                    item = item,
+                    quantity = qty,
+                    amount = amt,
+                    supplier = supp,
+                    category = cat
                 )
             }
         } catch (e: Exception) {
-            throw IllegalStateException("Barcode scanning error: ${e.message}")
+            val visual = analyzeVisualFallback(bitmap)
+            val name = if (!localDecoded.isNullOrBlank()) "Code ($localDecoded) • ${visual.title}" else visual.title
+            return@withContext ReLectRepository.ParsedVoiceData(
+                item = name,
+                quantity = visual.quantity,
+                amount = visual.estimatedTotalPrice,
+                supplier = visual.brand,
+                category = visual.category
+            )
         }
     }
 

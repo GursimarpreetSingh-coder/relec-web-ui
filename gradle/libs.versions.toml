@@ -93,6 +93,7 @@ firebase-appcheck-recaptcha = { group = "com.google.firebase", name = "firebase-
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
+text-recognition = { group = "com.google.mlkit", name = "text-recognition", version = "16.0.1" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

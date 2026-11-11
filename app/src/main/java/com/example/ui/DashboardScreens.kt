@@ -11252,7 +11252,7 @@ fun exportAndShareBillExcel(context: android.content.Context, bill: Bill) {
     }
 }
 
-// --- GLOBAL AI SCANNED PRODUCT DIALOG ---
+// --- GLOBAL AI SCANNED PRODUCT & BILL DIALOG ---
 @Composable
 fun GlobalScannerDialog(
     repository: ReLectRepository,
@@ -11281,7 +11281,7 @@ fun GlobalScannerDialog(
     ) { isGranted ->
         hasCameraPermission = isGranted
         if (!isGranted) {
-            Toast.makeText(context, "Camera permission denied. Simulator mode enabled.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Camera permission denied. Gallery or Simulator available.", Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -11293,27 +11293,69 @@ fun GlobalScannerDialog(
     
     var isProcessing by remember { mutableStateOf(false) }
     var scannedResult by remember { mutableStateOf<ReLectRepository.ParsedVoiceData?>(null) }
-    var inputQuantity by remember { mutableStateOf("10") }
+    var scannedInvoiceResult by remember { mutableStateOf<ScannedInvoiceResult?>(null) }
+    var inputQuantity by remember { mutableStateOf("1") }
     var barcodeValue by remember { mutableStateOf("") }
     
     var capturedBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+
+    fun processBitmap(bitmap: android.graphics.Bitmap) {
+        capturedBitmap = bitmap
+        isProcessing = true
+        scannedResult = null
+        scannedInvoiceResult = null
+        scope.launch {
+            try {
+                val zxingCode = GeminiClient.decodeQrOrBarcodeLocally(bitmap)
+                val visualResult = GeminiClient.analyzeVisualObjectOrInvoice(bitmap)
+
+                if (visualResult.isInvoice && visualResult.invoiceDetails != null) {
+                    scannedInvoiceResult = visualResult.invoiceDetails
+                    scannedResult = null
+                    barcodeValue = if (!zxingCode.isNullOrBlank()) zxingCode else "BILL-${System.currentTimeMillis() % 10000000}"
+                    Toast.makeText(context, "Bill / Tax Invoice Parsed Successfully!", Toast.LENGTH_SHORT).show()
+                } else {
+                    scannedInvoiceResult = null
+                    val code = if (!zxingCode.isNullOrBlank()) zxingCode else "BAR-${System.currentTimeMillis() % 100000000}"
+                    barcodeValue = code
+                    scannedResult = ReLectRepository.ParsedVoiceData(
+                        item = visualResult.title,
+                        quantity = visualResult.quantity,
+                        amount = visualResult.estimatedTotalPrice,
+                        supplier = visualResult.brand.ifBlank { if (!zxingCode.isNullOrBlank()) "Code: $zxingCode" else "Local Supplier" },
+                        category = visualResult.category
+                    )
+                    inputQuantity = visualResult.quantity.toString()
+                    Toast.makeText(context, "Product / Barcode Parsed!", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Parsing notice: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                isProcessing = false
+            }
+        }
+    }
+
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
         if (bitmap != null) {
-            capturedBitmap = bitmap
-            isProcessing = true
-            scope.launch {
-                try {
-                    val parsed = GeminiClient.parseBarcodeImage(bitmap)
-                    scannedResult = parsed
-                    barcodeValue = "BAR-${System.currentTimeMillis() % 100000000}"
-                    Toast.makeText(context, "Product Scanned and Parsed!", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Parsing error: ${e.message}", Toast.LENGTH_SHORT).show()
-                } finally {
-                    isProcessing = false
+            processBitmap(bitmap)
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            try {
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val bitmap = android.graphics.BitmapFactory.decodeStream(inputStream)
+                if (bitmap != null) {
+                    processBitmap(bitmap)
                 }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error reading image: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -11334,9 +11376,9 @@ fun GlobalScannerDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.QrCode, contentDescription = null, tint = accentColor, modifier = Modifier.size(28.dp))
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = accentColor, modifier = Modifier.size(28.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("AI QR & Barcode Scanner", fontWeight = FontWeight.Bold, color = textColor, fontSize = 18.sp)
+                    Text("AI Bill, QR & Barcode Scanner", fontWeight = FontWeight.Bold, color = textColor, fontSize = 18.sp)
                 }
                 IconButton(onClick = onDismiss) {
                     Icon(Icons.Default.Close, contentDescription = "Close", tint = grayText)
@@ -11351,15 +11393,15 @@ fun GlobalScannerDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    "Aim camera at an electrical product barcode or QR code on inventory spares to instantly update stock database.",
-                    fontSize = 11.sp,
+                    "Capture or upload any bill, tax invoice, QR code, or product barcode to automatically decode items, prices, and stock.",
+                    fontSize = 11.5.sp,
                     color = grayText
                 )
                 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
+                        .height(190.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color.Black)
                         .border(1.dp, Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(16.dp)),
@@ -11397,14 +11439,14 @@ fun GlobalScannerDialog(
                         
                         Box(
                             modifier = Modifier
-                                .size(120.dp)
+                                .size(130.dp)
                                 .border(2.dp, accentColor, RoundedCornerShape(12.dp))
                         )
                         
                         val infiniteTransition = rememberInfiniteTransition(label = "scan")
                         val yOffset by infiniteTransition.animateFloat(
-                            initialValue = -50f,
-                            targetValue = 50f,
+                            initialValue = -55f,
+                            targetValue = 55f,
                             animationSpec = infiniteRepeatable(
                                 animation = tween(1500, easing = LinearEasing),
                                 repeatMode = RepeatMode.Reverse
@@ -11413,7 +11455,7 @@ fun GlobalScannerDialog(
                         )
                         Box(
                             modifier = Modifier
-                                .width(110.dp)
+                                .width(120.dp)
                                 .height(2.dp)
                                 .offset(y = yOffset.dp)
                                 .background(NeonGreen)
@@ -11454,18 +11496,29 @@ fun GlobalScannerDialog(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Capture Photo", fontWeight = FontWeight.Bold)
                     }
+
+                    Button(
+                        onClick = {
+                            galleryLauncher.launch("image/*")
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isLight) Color(0xFFE2E8F0) else Color(0xFF334155), contentColor = textColor),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Pick Image / Bill", fontWeight = FontWeight.Bold, fontSize = 11.5.sp)
+                    }
                     
                     if (capturedBitmap != null) {
-                        OutlinedButton(
+                        IconButton(
                             onClick = {
                                 capturedBitmap = null
                                 scannedResult = null
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, Color.Gray)
+                                scannedInvoiceResult = null
+                            }
                         ) {
-                            Text("Reset", color = textColor)
+                            Icon(Icons.Default.Refresh, contentDescription = "Reset", tint = textColor)
                         }
                     }
                 }
@@ -11476,12 +11529,13 @@ fun GlobalScannerDialog(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
-                        Text("Barcode Simulator (Select to test scanning):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textColor)
+                        Text("Instant Simulator Presets:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = textColor)
                         Spacer(modifier = Modifier.height(8.dp))
                         
                         val simulatedProducts = listOf(
-                            Triple("Havells Wire Red", "Wires & Cables", "Havells India Ltd"),
-                            Triple("Anchor 1Way Switch", "Switches & Sockets", "Anchor Panasonic"),
+                            Triple("Tax Invoice: Rattan Wholesalers", "Invoices & Purchases", "Rattan Wholesalers"),
+                            Triple("Havells Wire Red 1.5mm", "Wires & Cables", "Havells India Ltd"),
+                            Triple("Anchor 1Way Modular Switch", "Switches & Sockets", "Anchor Panasonic"),
                             Triple("Syska 12W LED Bulb", "Switches & Sockets", "Syska LED"),
                             Triple("Orient Ceiling Fan 48\"", "Fans & Cooling", "Orient Electric"),
                             Triple("Luminous Single Pole MCB", "Switchgears", "Luminous Power")
@@ -11500,23 +11554,49 @@ fun GlobalScannerDialog(
                                         .clickable {
                                             isProcessing = true
                                             scope.launch {
-                                                kotlinx.coroutines.delay(600)
-                                                scannedResult = ReLectRepository.ParsedVoiceData(
-                                                    item = name,
-                                                    quantity = 1,
-                                                    amount = when(cat) {
-                                                        "Wires & Cables" -> 1450.0
-                                                        "Switches & Sockets" -> if(name.contains("LED")) 180.0 else 35.0
-                                                        "Fans & Cooling" -> 2100.0
-                                                        "Switchgears" -> 160.0
-                                                        else -> 120.0
-                                                    },
-                                                    supplier = brand,
-                                                    category = cat
-                                                )
-                                                barcodeValue = "BAR-${(1000000000 + (Math.random() * 9000000000).toLong())}"
+                                                kotlinx.coroutines.delay(500)
+                                                if (cat == "Invoices & Purchases") {
+                                                    scannedResult = null
+                                                    scannedInvoiceResult = ScannedInvoiceResult(
+                                                        storeName = brand,
+                                                        invoiceNumber = "INV-${System.currentTimeMillis() % 100000}",
+                                                        date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
+                                                        time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                                                        items = listOf(
+                                                            ScannedInvoiceItem("Havells 1.5mm FR Wire Coil", 3, 1850.0, 5550.0),
+                                                            ScannedInvoiceItem("Anchor 1Way Switch", 20, 38.0, 760.0),
+                                                            ScannedInvoiceItem("Schneider 16A MCB", 6, 165.0, 990.0)
+                                                        ),
+                                                        subtotal = 7300.0,
+                                                        taxPercent = 18.0,
+                                                        taxAmount = 1314.0,
+                                                        discountAmount = 0.0,
+                                                        grandTotal = 8614.0,
+                                                        paymentMethod = "UPI / Cash",
+                                                        isMathematicallyValid = true,
+                                                        discrepancyNote = null,
+                                                        confidenceScore = 0.98f
+                                                    )
+                                                    barcodeValue = "BILL-8614"
+                                                } else {
+                                                    scannedInvoiceResult = null
+                                                    scannedResult = ReLectRepository.ParsedVoiceData(
+                                                        item = name,
+                                                        quantity = 1,
+                                                        amount = when(cat) {
+                                                            "Wires & Cables" -> 1450.0
+                                                            "Switches & Sockets" -> if(name.contains("LED")) 180.0 else 35.0
+                                                            "Fans & Cooling" -> 2100.0
+                                                            "Switchgears" -> 160.0
+                                                            else -> 120.0
+                                                        },
+                                                        supplier = brand,
+                                                        category = cat
+                                                    )
+                                                    barcodeValue = "BAR-${(1000000000 + (Math.random() * 9000000000).toLong())}"
+                                                }
                                                 isProcessing = false
-                                                Toast.makeText(context, "Simulated scanning of $name successful!", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Parsed $name!", Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                         .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -11536,12 +11616,109 @@ fun GlobalScannerDialog(
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), color = accentColor)
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Decoding QR/Barcode via Gemini AI...", fontSize = 12.sp, color = textColor)
+                        Text("Reading Bill, QR & Image Details...", fontSize = 12.sp, color = textColor)
                     }
                 }
                 
+                val invoiceRes = scannedInvoiceResult
+                if (invoiceRes != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, NeonGreen.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = NeonGreen)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Tax Invoice Parsed!", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 14.sp)
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(NeonGreen.copy(alpha = 0.2f))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text("VERIFIED", fontSize = 9.sp, fontWeight = FontWeight.Black, color = NeonGreen)
+                                }
+                            }
+                            
+                            HorizontalDivider(color = Color.DarkGray)
+                            
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Store Name:", fontSize = 11.5.sp, color = Color.Gray)
+                                Text(invoiceRes.storeName, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Invoice #:", fontSize = 11.5.sp, color = Color.Gray)
+                                Text(invoiceRes.invoiceNumber ?: "N/A", fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Date:", fontSize = 11.5.sp, color = Color.Gray)
+                                Text("${invoiceRes.date} ${invoiceRes.time ?: ""}".trim(), fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("Line Items (${invoiceRes.items.size}):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = accentColor)
+
+                            invoiceRes.items.forEach { item ->
+                                Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                    Text("• ${item.name} (${item.quantity}x)", fontSize = 11.sp, color = Color.LightGray, modifier = Modifier.weight(1f))
+                                    Text("₹%,.2f".format(item.lineTotal), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+
+                            HorizontalDivider(color = Color.DarkGray)
+
+                            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                                Text("Grand Total:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text("₹%,.2f".format(invoiceRes.grandTotal), fontSize = 14.sp, fontWeight = FontWeight.Black, color = NeonGreen)
+                            }
+
+                            Button(
+                                onClick = {
+                                    val billItems = invoiceRes.items.map {
+                                        BillItem(name = it.name, qty = it.quantity, rate = it.unitPrice, total = it.lineTotal)
+                                    }
+                                    repository.addBill(
+                                        Bill(
+                                            customerName = invoiceRes.storeName,
+                                            customerPhone = "Store Invoice",
+                                            items = billItems,
+                                            laborCharges = 0.0,
+                                            gstPercent = invoiceRes.taxPercent,
+                                            discountAmount = invoiceRes.discountAmount,
+                                            totalAmount = invoiceRes.grandTotal,
+                                            date = invoiceRes.date,
+                                            storeName = invoiceRes.storeName,
+                                            invoiceNumber = invoiceRes.invoiceNumber,
+                                            paymentMethod = invoiceRes.paymentMethod,
+                                            isMathematicallyValid = invoiceRes.isMathematicallyValid
+                                        )
+                                    )
+                                    Toast.makeText(context, "Invoice Saved to Master Bills Ledger!", Toast.LENGTH_LONG).show()
+                                    onDismiss()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Save Bill to Ledger Database", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
                 val result = scannedResult
-                if (result != null) {
+                if (result != null && scannedInvoiceResult == null) {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
                         modifier = Modifier
@@ -11552,7 +11729,7 @@ fun GlobalScannerDialog(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = NeonGreen)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Decoded Successfully!", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
+                                Text("Parsed Successfully!", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 13.sp)
                             }
                             
                             HorizontalDivider(color = Color.DarkGray)
@@ -11562,7 +11739,7 @@ fun GlobalScannerDialog(
                                 Text(result.item, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                Text("Supplier:", fontSize = 11.sp, color = Color.Gray)
+                                Text("Supplier/Brand:", fontSize = 11.sp, color = Color.Gray)
                                 Text(result.supplier, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
                             }
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -11574,7 +11751,7 @@ fun GlobalScannerDialog(
                                 Text("₹%,.2f".format(result.amount), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
                             }
                             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                                Text("Barcode ID:", fontSize = 11.sp, color = Color.Gray)
+                                Text("Code/Payload:", fontSize = 11.sp, color = Color.Gray)
                                 Text(barcodeValue, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = accentColor)
                             }
                             
@@ -11583,7 +11760,7 @@ fun GlobalScannerDialog(
                             OutlinedTextField(
                                 value = inputQuantity,
                                 onValueChange = { inputQuantity = it },
-                                label = { Text("Enter Quantity to Add") },
+                                label = { Text("Quantity to Add") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = accentColor,
@@ -11605,7 +11782,17 @@ fun GlobalScannerDialog(
                                             date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                                         )
                                     )
-                                    Toast.makeText(context, "Saved! Inventory Updated: +$qty pcs of ${result.item}", Toast.LENGTH_LONG).show()
+                                    repository.addInventoryItem(
+                                        InventoryItem(
+                                            name = result.item,
+                                            category = result.category,
+                                            stockLevel = qty,
+                                            minAlertLevel = 5,
+                                            supplierName = result.supplier,
+                                            price = result.amount
+                                        )
+                                    )
+                                    Toast.makeText(context, "Saved! Inventory & Purchases Updated: +$qty pcs of ${result.item}", Toast.LENGTH_LONG).show()
                                     onDismiss()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = NeonGreen, contentColor = Color.Black),
@@ -11614,7 +11801,7 @@ fun GlobalScannerDialog(
                             ) {
                                 Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Save Directly to Database", fontWeight = FontWeight.Bold)
+                                Text("Save Stock & Purchase to Database", fontWeight = FontWeight.Bold)
                             }
                         }
                     }

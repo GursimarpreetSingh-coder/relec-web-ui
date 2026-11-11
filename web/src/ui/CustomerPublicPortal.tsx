@@ -57,7 +57,7 @@ export const CustomerPublicPortal: React.FC<CustomerPublicPortalProps> = ({
   };
 
   const [activeTab, setActiveTab] = useState<number>(0); // 0: My Jobs, 1: Book Repair, 2: My Bills, 3: Support
-  const [customerPhoneFilter, setCustomerPhoneFilter] = useState(session?.phone || '9417255831');
+  const [customerPhoneFilter, setCustomerPhoneFilter] = useState(session?.phone || '');
 
   // Book repair form
   const [custName, setCustName] = useState(session?.displayName || '');
@@ -66,7 +66,7 @@ export const CustomerPublicPortal: React.FC<CustomerPublicPortalProps> = ({
   const [problem, setProblem] = useState('');
   const [category, setCategory] = useState('Wiring Check');
   const [priority, setPriority] = useState<Priority>('MEDIUM');
-  const [preferredDateTime, setPreferredDateTime] = useState('Today 11:30 AM');
+  const [preferredDateTime, setPreferredDateTime] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   // Voice AI Complaint Assistant
@@ -292,7 +292,7 @@ export const CustomerPublicPortal: React.FC<CustomerPublicPortalProps> = ({
                   type="tel"
                   value={customerPhoneFilter}
                   onChange={(e) => setCustomerPhoneFilter(e.target.value)}
-                  placeholder="e.g. 9417255831"
+                  placeholder="Enter 10-digit mobile"
                   className={`px-3 py-1.5 rounded-xl text-xs font-mono border focus:outline-none ${isDarkTheme ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                 />
               </div>
@@ -447,7 +447,7 @@ export const CustomerPublicPortal: React.FC<CustomerPublicPortalProps> = ({
                     required
                     value={custName}
                     onChange={(e) => setCustName(e.target.value)}
-                    placeholder="e.g. Anita Sharma"
+                    placeholder="Enter your full name"
                     className={`w-full px-4 py-2.5 rounded-2xl text-xs border focus:outline-none ${isDarkTheme ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                   />
                 </div>
@@ -461,7 +461,7 @@ export const CustomerPublicPortal: React.FC<CustomerPublicPortalProps> = ({
                     maxLength={10}
                     value={custPhone}
                     onChange={(e) => setCustPhone(e.target.value)}
-                    placeholder="9417255831"
+                    placeholder="Enter 10-digit mobile number"
                     className={`w-full px-4 py-2.5 rounded-2xl text-xs border focus:outline-none ${isDarkTheme ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                   />
                 </div>

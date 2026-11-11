@@ -113,6 +113,7 @@ fun LoginScreen(
     var inputCustomerName by remember { mutableStateOf("") }
     var inputCustomerPhone by remember { mutableStateOf("") }
     var inputCustomerOtp by remember { mutableStateOf("") }
+    var showCustomerTestCode by remember { mutableStateOf(false) }
 
     // Sign Up Inputs
     var signupName by remember { mutableStateOf("") }
@@ -604,20 +605,11 @@ fun LoginScreen(
                                             .clickable {
                                                 selectedRole = role
                                                 isWorkerOnboarding = false
-                                                when (role) {
-                                                    "Admin" -> {
-                                                        loginInputEmailOrPhone = "gursimarpsr@gmail.com"
-                                                        loginInputCredentialPassword = "Admin@123"
-                                                    }
-                                                    "Worker" -> {
-                                                        loginInputEmailOrPhone = "worker@relect.com"
-                                                        loginInputCredentialPassword = "Worker@123"
-                                                    }
-                                                    "Customer" -> {
-                                                        inputCustomerPhone = "9812045612"
-                                                        inputCustomerName = "Rajesh Kumar"
-                                                    }
-                                                }
+                                                loginInputEmailOrPhone = ""
+                                                loginInputCredentialPassword = ""
+                                                inputCustomerPhone = ""
+                                                inputCustomerName = ""
+                                                inputCustomerOtp = ""
                                             }
                                             .padding(vertical = 7.dp),
                                         contentAlignment = Alignment.Center
@@ -819,36 +811,24 @@ fun LoginScreen(
                                                         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.45f)),
                                                         modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
                                                     ) {
-                                                        Row(
-                                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.SpaceBetween
-                                                        ) {
-                                                            Column(modifier = Modifier.weight(1f)) {
-                                                                Text(
-                                                                    "SMS OTP: $activeOtpCode",
-                                                                    fontSize = 14.sp,
-                                                                    fontWeight = FontWeight.Black,
-                                                                    color = accentColor,
-                                                                    letterSpacing = 1.sp
-                                                                )
-                                                                Text(
-                                                                    "Dispatched to $inputCustomerPhone",
-                                                                    fontSize = 10.sp,
-                                                                    color = grayText
-                                                                )
-                                                            }
-                                                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                                Button(
-                                                                    onClick = {
-                                                                        inputCustomerOtp = activeOtpCode
-                                                                        Toast.makeText(context, "OTP Code auto-filled!", Toast.LENGTH_SHORT).show()
-                                                                    },
-                                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                                                    modifier = Modifier.height(30.dp),
-                                                                    colors = ButtonDefaults.buttonColors(containerColor = accentColor)
-                                                                ) {
-                                                                    Text("⚡ Auto-fill", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                        Column(modifier = Modifier.padding(10.dp)) {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                            ) {
+                                                                Column(modifier = Modifier.weight(1f)) {
+                                                                    Text(
+                                                                        "Verification code sent to +91 $inputCustomerPhone",
+                                                                        fontSize = 11.5.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        color = textColor
+                                                                    )
+                                                                    Text(
+                                                                        "Check your SMS messages",
+                                                                        fontSize = 10.sp,
+                                                                        color = grayText
+                                                                    )
                                                                 }
                                                                 OutlinedButton(
                                                                     onClick = {
@@ -864,6 +844,27 @@ fun LoginScreen(
                                                                 ) {
                                                                     Text("💬 SMS App", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
                                                                 }
+                                                            }
+
+                                                            if (showCustomerTestCode) {
+                                                                Spacer(modifier = Modifier.height(6.dp))
+                                                                Row(
+                                                                    modifier = Modifier.fillMaxWidth(),
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                                ) {
+                                                                    Text("Offline Test Code: $activeOtpCode", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = accentColor)
+                                                                    TextButton(onClick = { inputCustomerOtp = activeOtpCode }) {
+                                                                        Text("Insert", fontSize = 10.sp, color = accentColor)
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                Text(
+                                                                    "No SMS received? Tap to view test code",
+                                                                    fontSize = 9.5.sp,
+                                                                    color = grayText,
+                                                                    modifier = Modifier.clickable { showCustomerTestCode = true }.padding(top = 4.dp)
+                                                                )
                                                             }
                                                         }
                                                     }

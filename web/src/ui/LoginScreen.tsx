@@ -51,11 +51,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   // Customer OTP state
-  const [customerName, setCustomerName] = useState('Anita Sharma');
-  const [customerPhone, setCustomerPhone] = useState('9417255831');
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [customerOtp, setCustomerOtp] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [dispatchedOtpCode, setDispatchedOtpCode] = useState('');
+  const [showDevOtp, setShowDevOtp] = useState(false);
 
   // Sign Up state
   const [signupName, setSignupName] = useState('');
@@ -80,17 +81,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     setSuccessMsg('');
   };
 
-  // Switch role handler: auto-adjust demo credentials
+  // Switch role handler: clean input fields without hardcoded passwords
   const handleRoleChange = (role: 'Admin' | 'Worker' | 'Customer') => {
     setSelectedRole(role);
     clearMessages();
-    if (role === 'Admin') {
-      setLoginIdentifier('gursimarpsr@gmail.com');
-      setLoginPassword('Admin@123');
-    } else if (role === 'Worker') {
-      setLoginIdentifier('worker@relect.com');
-      setLoginPassword('Worker@123');
-    }
+    setLoginIdentifier('');
+    setLoginPassword('');
+    setCustomerPhone('');
+    setCustomerName('');
+    setCustomerOtp('');
+    setIsOtpSent(false);
   };
 
   // Sign in submit
@@ -169,7 +169,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   // Customer send OTP
   const handleSendCustomerOtp = async () => {
     clearMessages();
-    if (!customerPhone || customerPhone.replace(/\D/g, '').length < 10) {
+    const cleanDigits = customerPhone.replace(/\D/g, '');
+    if (!customerPhone || cleanDigits.length < 10) {
       setErrorMsg('Please enter a valid 10-digit mobile number.');
       return;
     }
@@ -180,8 +181,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     if (res.success) {
       setIsOtpSent(true);
       setDispatchedOtpCode(res.codeOrError);
-      setCustomerOtp(res.codeOrError); // auto-fill for frictionless UX
-      setSuccessMsg(`Verification OTP ${res.codeOrError} sent to +91 ${customerPhone}!`);
+      setCustomerOtp(''); // Keep empty - real users enter real OTP code
+      setShowDevOtp(false);
+      setSuccessMsg(`Verification code sent to +91 ${cleanDigits.slice(-10)}. Please enter the 6-digit code below.`);
     } else {
       setErrorMsg(res.codeOrError);
     }
@@ -457,29 +459,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               </div>
             </div>
 
-            {/* Quick Demo Credentials Pill */}
-            <div className={`p-2.5 rounded-xl border text-[11px] flex items-center justify-between ${isDarkTheme ? 'bg-slate-950/60 border-slate-800/80 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
-              <div>
-                <span className="font-bold text-slate-300">Preset: </span>
-                <span>{selectedRole === 'Admin' ? 'gursimarpsr@gmail.com' : 'worker@relect.com'}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectedRole === 'Admin') {
-                    setLoginIdentifier('gursimarpsr@gmail.com');
-                    setLoginPassword('Admin@123');
-                  } else {
-                    setLoginIdentifier('worker@relect.com');
-                    setLoginPassword('Worker@123');
-                  }
-                }}
-                className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-white hover:bg-slate-700"
-              >
-                Auto-Fill
-              </button>
-            </div>
-
             <button
               type="submit"
               disabled={isLoading}
@@ -551,7 +530,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                   type="text"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="e.g. Anita Sharma"
+                  placeholder="Enter your full name"
                   className={`w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm border focus:outline-none transition-all ${isDarkTheme ? 'bg-slate-950 border-slate-800 focus:border-blue-500 text-white' : 'bg-slate-50 border-slate-200 focus:border-blue-500 text-slate-900'}`}
                 />
               </div>
@@ -569,7 +548,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     maxLength={10}
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="9417255831"
+                    placeholder="Enter 10-digit mobile number"
                     className={`w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm border focus:outline-none transition-all ${isDarkTheme ? 'bg-slate-950 border-slate-800 focus:border-blue-500 text-white' : 'bg-slate-50 border-slate-200 focus:border-blue-500 text-slate-900'}`}
                   />
                 </div>
@@ -586,7 +565,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             </div>
 
             {isOtpSent && (
-              <div>
+              <div className="space-y-2">
                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                   Enter 6-Digit OTP Code
                 </label>
@@ -597,10 +576,47 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                     maxLength={6}
                     value={customerOtp}
                     onChange={(e) => setCustomerOtp(e.target.value)}
-                    placeholder="e.g. 524189"
+                    placeholder="Enter 6-digit verification code"
                     className={`w-full pl-10 pr-4 py-2.5 rounded-2xl text-sm font-mono tracking-widest border focus:outline-none transition-all ${isDarkTheme ? 'bg-slate-950 border-slate-800 focus:border-blue-500 text-white' : 'bg-slate-50 border-slate-200 focus:border-blue-500 text-slate-900'}`}
                   />
                 </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                  <a
+                    href={`https://api.whatsapp.com/send?phone=91${customerPhone.replace(/\D/g, '').slice(-10)}&text=${encodeURIComponent(`[ReLec Security] Your verification code is: ${dispatchedOtpCode}. Valid for 5 minutes.`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 underline underline-offset-2"
+                  >
+                    <span>Receive via WhatsApp</span>
+                  </a>
+                  <a
+                    href={`sms:+91${customerPhone.replace(/\D/g, '').slice(-10)}?body=${encodeURIComponent(`[ReLec Security] Your verification code is: ${dispatchedOtpCode}`)}`}
+                    className="text-[11px] font-bold text-blue-400 hover:text-blue-300 flex items-center gap-1 underline underline-offset-2"
+                  >
+                    <span>Open SMS App</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setShowDevOtp(!showDevOtp)}
+                    className="text-[10px] text-slate-500 hover:text-slate-400"
+                  >
+                    {showDevOtp ? 'Hide test code' : 'No SMS? Test code'}
+                  </button>
+                </div>
+
+                {showDevOtp && (
+                  <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center justify-between">
+                    <span className="text-slate-400">Offline / Test Code: <strong className="font-mono text-emerald-400 tracking-wider text-sm">{dispatchedOtpCode}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => setCustomerOtp(dispatchedOtpCode)}
+                      className="text-[10px] font-bold px-2 py-1 bg-slate-800 text-slate-200 rounded hover:bg-slate-700"
+                    >
+                      Insert
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

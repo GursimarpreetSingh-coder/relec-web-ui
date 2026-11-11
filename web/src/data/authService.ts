@@ -429,7 +429,62 @@ class AuthService {
 
       await this.logAudit('OTP_GENERATED', `OTP generated for ${cleanTarget} (${purpose})`, null, 'System');
 
-      // Save last OTP in localStorage for easy display / test convenience
+      // Attempt live carrier SMS delivery if gateway is configured
+      const fast2smsKey = localStorage.getItem('fast2sms_api_key');
+      const twilioSid = localStorage.getItem('twilio_account_sid');
+      const twilioToken = localStorage.getItem('twilio_auth_token');
+      const twilioFrom = localStorage.getItem('twilio_phone_number');
+
+      if (isPhone && fast2smsKey && fast2smsKey.trim() !== '') {
+        try {
+          const clean10 = digitsOnly.slice(-10);
+          await fetch('https://www.fast2sms.com/dev/bulkV2', {
+            method: 'POST',
+            headers: {
+              'authorization': fast2smsKey.trim(),
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              route: 'otp',
+              variables_values: otpCode,
+              numbers: clean10
+            })
+          });
+        } catch (smsErr) {
+          console.warn('Fast2SMS dispatch notice:', smsErr);
+        }
+      } else if (isPhone && twilioSid && twilioToken && twilioFrom) {
+        try {
+          const formattedTo = cleanTarget.startsWith('+') ? cleanTarget : `+91${digitsOnly.slice(-10)}`;
+          const basicAuth = btoa(`${twilioSid}:${twilioToken}`);
+          const form = new URLSearchParams();
+          form.append('To', formattedTo);
+          form.append('From', twilioFrom);
+          form.append('Body', `[ReLec] Your security verification code is: ${otpCode}. Valid for 5 minutes.`);
+          await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${basicAuth}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: form.toString()
+          });
+        } catch (twErr) {
+          console.warn('Twilio dispatch notice:', twErr);
+        }
+      }
+
+      // Web Notification if permission granted
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          new Notification('🔐 ReLec Security Code', {
+            body: `Your verification code is: ${otpCode}. Valid for 5 minutes.`,
+            icon: '/assets/relec_blue_icon.png'
+          });
+        } catch (_) {}
+      }
+
+      // Save last OTP in localStorage for easy lookup / verification
       localStorage.setItem('last_dispatched_otp', JSON.stringify({ code: otpCode, target: cleanTarget, time: Date.now() }));
 
       return { success: true, codeOrError: otpCode };
