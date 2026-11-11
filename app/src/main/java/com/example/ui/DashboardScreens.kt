@@ -8419,34 +8419,59 @@ fun ExpensesScreen(repository: ReLectRepository, accentColor: Color) {
 
     val context = LocalContext.current
 
-    val voiceLauncher = rememberSpeechRecognizerLauncher(
-        onResult = { text ->
-            voiceInputText = text
-            if (text.isNotBlank()) {
-                isProcessingVoice = true
-                scope.launch {
-                    try {
-                        val parsed = GeminiClient.parseVoiceInput(text)
-                        expTitle = parsed.item
-                        expAmount = parsed.amount.toString()
-                        
-                        val matchedCat = categories.find { 
+    // Real-time NLP voice parser with Gemini AI & multilingual fallback
+    val processExpenseVoiceInput: (String) -> Unit = { rawInput ->
+        if (rawInput.isNotBlank()) {
+            isProcessingVoice = true
+            scope.launch {
+                try {
+                    val parsed = GeminiClient.parseVoiceInput(rawInput)
+                    var finalAmount = parsed.amount
+                    if (finalAmount <= 0.0) {
+                        val numMatch = "\\b\\d+(?:\\.\\d+)?\\b".toRegex().find(rawInput)
+                        finalAmount = numMatch?.value?.toDoubleOrNull() ?: GeminiClient.extractSpokenNumber(rawInput)
+                    }
+
+                    val cleanNote = rawInput
+                        .replace("\\b\\d+(?:\\.\\d+)?\\b".toRegex(), "")
+                        .replace(Regex("\\b(rupay|rupaye|rupees|rs|inr|kharch|kharcha|diye|ditte|paid|spent|₹|रुपये|रुपए|खर्च|दिए|रुपया|रूपीस|रु)\\b", RegexOption.IGNORE_CASE), "")
+                        .trim()
+
+                    expTitle = if (cleanNote.isNotBlank()) cleanNote else parsed.item
+                    expAmount = if (finalAmount > 0.0) {
+                        if (finalAmount == finalAmount.toLong().toDouble()) finalAmount.toLong().toString() else finalAmount.toString()
+                    } else "0.0"
+
+                    val lower = rawInput.lowercase(Locale.ROOT)
+                    val matchedCat = when {
+                        lower.contains("chai") || lower.contains("tea") || lower.contains("चाय") || lower.contains("samosa") || lower.contains("समोसा") || lower.contains("nashta") || lower.contains("नाश्ता") || lower.contains("biscuit") || lower.contains("बिस्कुट") || lower.contains("पानी") || lower.contains("water") -> "Tea & Refreshments"
+                        lower.contains("petrol") || lower.contains("diesel") || lower.contains("fuel") || lower.contains("पैट्रोल") || lower.contains("पेट्रोल") || lower.contains("डीजल") || lower.contains("auto") || lower.contains("rickshaw") || lower.contains("किराया") || lower.contains("fare") -> "Travel & Fuel"
+                        lower.contains("safai") || lower.contains("cleaning") || lower.contains("सफाई") || lower.contains("झाड़ू") || lower.contains("repair") || lower.contains("paint") || lower.contains("दुकान") || lower.contains("shop") -> "Shop Maintenance"
+                        lower.contains("wire") || lower.contains("cable") || lower.contains("तार") || lower.contains("केबल") || lower.contains("कॉयल") || lower.contains("coil") -> "Wiring & Cables"
+                        lower.contains("tool") || lower.contains("screw") || lower.contains("पेंच") || lower.contains("tape") || lower.contains("टेप") || lower.contains("टेस्टर") || lower.contains("पिलास") || lower.contains("cutter") || lower.contains("drill") -> "Tools & Hardware"
+                        else -> categories.find { 
                             it.equals(parsed.category, ignoreCase = true) || 
                             parsed.category.contains(it, ignoreCase = true) ||
                             it.contains(parsed.category, ignoreCase = true)
-                        }
-                        if (matchedCat != null) {
-                            expCategory = matchedCat
-                        }
-                        Toast.makeText(context, "Voice parsed: \"$text\"", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                    } finally {
-                        isProcessingVoice = false
-                        voiceInputText = ""
+                        } ?: "Miscellaneous"
                     }
+                    expCategory = matchedCat
+
+                    Toast.makeText(context, "Voice parsed: ${if (expAmount != "0.0") "₹$expAmount" else ""} $expTitle", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isProcessingVoice = false
+                    voiceInputText = ""
                 }
             }
+        }
+    }
+
+    val voiceLauncher = rememberSpeechRecognizerLauncher(
+        onResult = { text ->
+            voiceInputText = text
+            processExpenseVoiceInput(text)
         },
         onStateChange = { listening, error ->
             isListeningVoice = listening
@@ -8557,31 +8582,7 @@ fun ExpensesScreen(repository: ReLectRepository, accentColor: Color) {
 
         // Real-time NLP voice parser with Gemini AI
         val triggerExpenseParsing: (String) -> Unit = { text ->
-            if (text.isNotBlank()) {
-                isProcessingVoice = true
-                scope.launch {
-                    try {
-                        val parsed = GeminiClient.parseVoiceInput(text)
-                        expTitle = parsed.item
-                        expAmount = parsed.amount.toString()
-                        
-                        val matchedCat = categories.find { 
-                            it.equals(parsed.category, ignoreCase = true) || 
-                            parsed.category.contains(it, ignoreCase = true) ||
-                            it.contains(parsed.category, ignoreCase = true)
-                        }
-                        if (matchedCat != null) {
-                            expCategory = matchedCat
-                        }
-                        Toast.makeText(context, "Voice parsed successfully via Gemini AI!", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                    } finally {
-                        isProcessingVoice = false
-                        voiceInputText = ""
-                    }
-                }
-            }
+            processExpenseVoiceInput(text)
         }
 
         Card(

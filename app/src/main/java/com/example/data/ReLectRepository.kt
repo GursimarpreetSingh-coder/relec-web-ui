@@ -263,6 +263,8 @@ class ReLectRepository private constructor(context: Context) {
             prefs.edit().putBoolean("has_purged_legacy_mock_data_v2", true).apply()
             clearAllToyData()
         }
+        val currentBrandTheme = prefs.getString("active_brand_theme", "cyber_blue") ?: "cyber_blue"
+        updateLauncherIcon(appContext, currentBrandTheme == "revolt_crimson")
     }
 
     fun setBrandTheme(themeId: String) {
@@ -968,7 +970,29 @@ class ReLectRepository private constructor(context: Context) {
         }
 
         fun updateLauncherIcon(context: Context, isRevolt: Boolean) {
-            Log.d("ReLectRepository", "Active brand theme registered: isRevolt=$isRevolt")
+            try {
+                val pm = context.packageManager
+                val pkg = context.packageName
+                val blueComponent = android.content.ComponentName(pkg, "$pkg.ReLecBlueLauncher")
+                val redComponent = android.content.ComponentName(pkg, "$pkg.ReVoltRedLauncher")
+
+                val targetEnabled = if (isRevolt) redComponent else blueComponent
+                val targetDisabled = if (isRevolt) blueComponent else redComponent
+
+                pm.setComponentEnabledSetting(
+                    targetEnabled,
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                    android.content.pm.PackageManager.DONT_KILL_APP
+                )
+                pm.setComponentEnabledSetting(
+                    targetDisabled,
+                    android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    android.content.pm.PackageManager.DONT_KILL_APP
+                )
+                Log.i("ReLectRepository", "Switched launcher icon to: ${if (isRevolt) "RE-VOLT Red" else "ReLec Blue"}")
+            } catch (e: Exception) {
+                Log.e("ReLectRepository", "Failed to update launcher icon: ${e.message}", e)
+            }
         }
     }
 }

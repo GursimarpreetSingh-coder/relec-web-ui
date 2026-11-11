@@ -463,7 +463,10 @@ fun SplashScreen(
                     )
                     .border(
                         1.5.dp,
-                        Brush.linearGradient(listOf(accentColor, Color(0xFF6366F1))),
+                        Brush.linearGradient(
+                            if (isRevolt) listOf(Color(0xFFEF4444), Color(0xFFB91C1C))
+                            else listOf(accentColor, Color(0xFF0284C7))
+                        ),
                         RoundedCornerShape(32.dp)
                     ),
                 contentAlignment = Alignment.Center

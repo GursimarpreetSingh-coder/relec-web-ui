@@ -218,108 +218,199 @@ object GeminiClient {
         return@withContext parseMultilingualHeuristic(cleanTranscript)
     }
 
+    // Comprehensive number extractor from text supporting digits, Devanagari words, Gurmukhi words, and phonetic words
+    fun extractSpokenNumber(rawText: String): Double {
+        val text = rawText.lowercase(Locale.ROOT)
+        // 1. Direct digits
+        val digitMatch = "\\b\\d+(?:\\.\\d+)?\\b".toRegex().find(text)
+        if (digitMatch != null) {
+            val num = digitMatch.value.toDoubleOrNull() ?: 0.0
+            if (text.contains("hazar") || text.contains("hazaar") || text.contains("हज़ार") || text.contains("हजार") || text.contains("ਹਜ਼ਾਰ")) {
+                if (num < 1000) return num * 1000.0
+            }
+            if (text.contains("sau") || text.contains("सौ") || text.contains("ਸੌ") || text.contains("hundred")) {
+                if (num < 100) return num * 100.0
+            }
+            return num
+        }
+
+        // 2. Hindi Devanagari, Gurmukhi, and Romanized number word mapping
+        val words = mapOf(
+            "एक" to 1.0, "ਦੋ" to 2.0, "दो" to 2.0, "तीन" to 3.0, "ਤਿੰਨ" to 3.0,
+            "चार" to 4.0, "ਚਾਰ" to 4.0, "पांच" to 5.0, "पाँच" to 5.0, "ਪੰਜ" to 5.0,
+            "छह" to 6.0, "छः" to 6.0, "ਛੇ" to 6.0, "सात" to 7.0, "ਸੱਤ" to 7.0,
+            "आठ" to 8.0, "ਅੱਠ" to 8.0, "नौ" to 9.0, "ਨੌਂ" to 9.0, "दस" to 10.0, "ਦਸ" to 10.0,
+            "ग्यारह" to 11.0, "बारह" to 12.0, "तेरह" to 13.0, "चौदह" to 14.0, "पंद्रह" to 15.0,
+            "सोलह" to 16.0, "सत्रह" to 17.0, "अठारह" to 18.0, "उन्नीस" to 19.0, "बीस" to 20.0, "ਵੀਹ" to 20.0,
+            "पच्चीस" to 25.0, "तीस" to 30.0, "चालीस" to 40.0, "पचास" to 50.0, "साठ" to 60.0,
+            "सत्तर" to 70.0, "अस्सी" to 80.0, "नब्बे" to 90.0, "सौ" to 100.0,
+            "हज़ार" to 1000.0, "हजार" to 1000.0, "ਹਜ਼ਾਰ" to 1000.0, "लाख" to 100000.0,
+            "सिटी" to 60.0, "सिक्सटी" to 60.0, "सिट्टी" to 60.0, "फिफ्टी" to 50.0, "हंड्रेड" to 100.0,
+            "ek" to 1.0, "do" to 2.0, "teen" to 3.0, "char" to 4.0, "chaar" to 4.0,
+            "paanch" to 5.0, "panj" to 5.0, "chhe" to 6.0, "saat" to 7.0, "aath" to 8.0,
+            "nau" to 9.0, "das" to 10.0, "pandrah" to 15.0, "bees" to 20.0, "pachees" to 25.0,
+            "pachaas" to 50.0, "sau" to 100.0, "hazaar" to 1000.0, "hazar" to 1000.0
+        )
+
+        for ((word, value) in words.entries.sortedByDescending { it.key.length }) {
+            if (text.contains(word)) {
+                if (text.contains("हज़ार") || text.contains("हजार") || text.contains("hazar") || text.contains("hazaar") || text.contains("ਹਜ਼ਾਰ")) {
+                    if (value < 1000) return value * 1000.0
+                }
+                if (text.contains("सौ") || text.contains("sau") || text.contains("hundred") || text.contains("ਸੌ")) {
+                    if (value < 100) return value * 100.0
+                }
+                return value
+            }
+        }
+        return 0.0
+    }
+
     // Comprehensive Local Rule-Based NLP Parser for Punjabi, Hindi, English, and Hinglish
     fun parseMultilingualHeuristic(rawTranscript: String): ParsedVoiceIntent {
         val text = rawTranscript.lowercase(Locale.ROOT)
         var detectedLang = "english"
         if (text.any { it in '\u0A00'..'\u0A7F' }) detectedLang = "punjabi"
         else if (text.any { it in '\u0900'..'\u097F' }) detectedLang = "hindi"
-        else if (listOf("karo", "likho", "daalo", "rupay", "kharcha", "paao", "hai", "ka", "ki", "mein", "bhaav").any { text.contains(it) }) detectedLang = "hinglish"
+        else if (listOf("karo", "likho", "daalo", "rupay", "kharcha", "paao", "hai", "ka", "ki", "mein", "bhaav", "de").any { text.contains(it) }) detectedLang = "hinglish"
 
-        // Multilingual Number Extraction
+        // 1. Multilingual Number & Quantity Extraction
         var qty = 1
-        val punjabiNumbers = mapOf(
-            "ਇੱਕ" to 1, "ਦੋ" to 2, "ਤਿੰਨ" to 3, "ਚਾਰ" to 4, "ਪੰਜ" to 5,
-            "ਛੇ" to 6, "ਸੱਤ" to 7, "ਅੱਠ" to 8, "ਨੌਂ" to 9, "ਦਸ" to 10,
-            "ਵੀਹ" to 20, "ਪੰਜਾਹ" to 50, "ਸੌ" to 100
+        val numPattern = "(?:(\\d+|एक|दो|तीन|चार|पांच|पाँच|छह|सात|आठ|नौ|दस|ग्यारह|बारह|पंद्रह|बीस|ਪੰਜ|ਚਾਰ|ਤਿੰਨ|ਦੋ|ਇੱਕ|ek|do|teen|char|chaar|paanch|chhe|saat|aath|nau|das)\\s*(?:चीज|पीस|piece|pcs|pc|थान|नग|nag|डब्बा|dabba|dabbe|box|boxes|packet|पैकेट|meter|मीटर|coil|कॉयल|roll|रोल))".toRegex()
+        val numMatch = numPattern.find(text)
+
+        val wordToNum = mapOf(
+            "एक" to 1, "ਦੋ" to 2, "दो" to 2, "तीन" to 3, "ਤਿੰਨ" to 3,
+            "चार" to 4, "ਚਾਰ" to 4, "पांच" to 5, "पाँच" to 5, "ਪੰਜ" to 5,
+            "छह" to 6, "छः" to 6, "ਛੇ" to 6, "सात" to 7, "ਸੱਤ" to 7,
+            "आठ" to 8, "ਅੱਠ" to 8, "नौ" to 9, "ਨੌਂ" to 9, "दस" to 10, "ਦਸ" to 10,
+            "ग्यारह" to 11, "बारह" to 12, "तेरह" to 13, "चौदह" to 14, "पंद्रह" to 15,
+            "सोलह" to 16, "सत्रह" to 17, "अठारह" to 18, "उन्नीस" to 19, "बीस" to 20, "ਵੀਹ" to 20,
+            "पच्चीस" to 25, "तीस" to 30, "चालीस" to 40, "पचास" to 50, "साठ" to 60,
+            "सत्तर" to 70, "अस्सी" to 80, "नब्बे" to 90, "सौ" to 100,
+            "ek" to 1, "do" to 2, "teen" to 3, "char" to 4, "chaar" to 4,
+            "paanch" to 5, "panj" to 5, "chhe" to 6, "saat" to 7, "aath" to 8,
+            "nau" to 9, "das" to 10, "pandrah" to 15, "bees" to 20, "pachees" to 25, "pachaas" to 50
         )
-        val hindiNumbers = mapOf(
-            "ek" to 1, "do" to 2, "teen" to 3, "char" to 4, "chaar" to 4, "paanch" to 5, "panj" to 5,
-            "chhah" to 6, "saat" to 7, "aath" to 8, "nau" to 9, "dus" to 10, "das" to 10,
-            "gyarah" to 11, "barah" to 12, "terah" to 13, "chaudah" to 14, "pandrah" to 15,
-            "solah" to 16, "satrah" to 17, "atharah" to 18, "unnees" to 19, "bees" to 20, "veeh" to 20,
-            "pachees" to 25, "panji" to 25, "tees" to 30, "pachaas" to 50, "panjah" to 50, "sau" to 100
-        )
-        for ((word, num) in punjabiNumbers) {
-            if (text.contains(word)) { qty = num; break }
-        }
-        if (qty == 1) {
-            for ((word, num) in hindiNumbers) {
-                if (text.contains("\\b$word\\b".toRegex())) { qty = num; break }
+
+        if (numMatch != null) {
+            val token = numMatch.groupValues[1]
+            qty = token.toIntOrNull() ?: wordToNum[token] ?: 1
+        } else {
+            // General word search
+            for ((word, num) in wordToNum) {
+                if (text.contains(word)) {
+                    qty = num
+                    break
+                }
             }
         }
+
         val digits = "\\b\\d+\\b".toRegex().findAll(text).map { it.value.toInt() }.toList()
+        if (numMatch == null && digits.isNotEmpty() && qty == 1) {
+            val first = digits[0]
+            if (first < 50 && !listOf("rupay", "rupaye", "rupees", "rs", "₹", "रुपये", "रुपए", "रूपीस", "रुपया", "kharcha", "खर्च", "paid").any { text.contains(it) }) {
+                qty = first
+            }
+        }
 
         // Unit Extraction
         val unit = when {
-            text.contains("packet") || text.contains("packetan") || text.contains("pkt") -> "packets"
-            text.contains("meter") || text.contains("metran") || text.contains("mtr") -> "meters"
-            text.contains("piece") || text.contains("pcs") || text.contains("pc") || text.contains("nag") -> "pcs"
-            text.contains("box") || text.contains("dabba") || text.contains("dabbe") -> "boxes"
-            text.contains("kg") || text.contains("kilo") -> "kg"
-            text.contains("liter") || text.contains("litre") -> "liters"
-            text.contains("roll") || text.contains("coil") -> "rolls"
+            text.contains("packet") || text.contains("पैकेट") || text.contains("packetan") || text.contains("pkt") -> "packets"
+            text.contains("meter") || text.contains("मीटर") || text.contains("metran") || text.contains("mtr") -> "meters"
+            text.contains("piece") || text.contains("पीस") || text.contains("चीज") || text.contains("pcs") || text.contains("pc") || text.contains("nag") || text.contains("नग") -> "pcs"
+            text.contains("box") || text.contains("dabba") || text.contains("डब्बा") || text.contains("dabbe") -> "boxes"
+            text.contains("kg") || text.contains("kilo") || text.contains("किलो") -> "kg"
+            text.contains("roll") || text.contains("coil") || text.contains("कॉयल") || text.contains("बंडल") -> "rolls"
             else -> "pcs"
         }
 
-        // Action detection
+        // 2. Action Detection
         var action = VoiceAction.ADD_ITEM
         var targetScreen: String? = null
-        if (text.contains("expense") || text.contains("kharcha") || text.contains("kharch") || text.contains("spent") || text.contains("paid")) {
+        val expenseKeywords = listOf(
+            "expense", "kharcha", "kharch", "spent", "paid", "खर्च", "खर्चा", "दिए", "chai", "tea", "चाय",
+            "nashta", "नाश्ता", "samosa", "समोसा", "petrol", "diesel", "fuel", "किराया", "conveyance",
+            "cleaning", "सफाई", "झाड़ू", "milk", "दूध", "rupay", "rupaye", "rupees", "rs", "₹", "रुपये", "रुपए", "रूपीस", "रुपया"
+        )
+        if (expenseKeywords.any { text.contains(it) }) {
             action = VoiceAction.LOG_EXPENSE
             targetScreen = "Expenses"
-        } else if (text.contains("kholo") || text.contains("open") || text.contains("dikhao") || text.contains("navigate") || text.contains("go to")) {
+        } else if (text.contains("kholo") || text.contains("open") || text.contains("dikhao") || text.contains("navigate") || text.contains("खोल") || text.contains("दिखाओ")) {
             action = VoiceAction.NAVIGATE
             targetScreen = when {
-                text.contains("inventory") || text.contains("stock") -> "Inventory"
-                text.contains("bill") || text.contains("invoice") -> "Billing"
-                text.contains("worker") || text.contains("karigar") -> "Workers"
-                text.contains("service") || text.contains("complaint") -> "Services"
-                text.contains("expense") || text.contains("kharcha") -> "Expenses"
-                text.contains("customer") || text.contains("grahak") -> "Customers"
+                text.contains("inventory") || text.contains("stock") || text.contains("सामान") -> "Inventory"
+                text.contains("bill") || text.contains("invoice") || text.contains("बिल") -> "Billing"
+                text.contains("worker") || text.contains("karigar") || text.contains("कारीगर") -> "Workers"
+                text.contains("service") || text.contains("complaint") || text.contains("शिकायत") -> "Services"
+                text.contains("expense") || text.contains("kharcha") || text.contains("खर्चा") -> "Expenses"
+                text.contains("customer") || text.contains("grahak") || text.contains("ग्राहक") -> "Customers"
                 else -> "Dashboard"
             }
         }
 
-        // Brand Recognition
-        val knownBrands = listOf(
-            "Havells", "Polycab", "Finolex", "Anchor", "Legrand", "Schneider", "Orient",
-            "Crompton", "Bajaj", "Philips", "Syska", "Wipro", "Luminous", "Microtek",
-            "Exide", "V-Guard", "Usha", "Cona", "GM", "Goldmedal", "RR Kabel", "KEI"
+        // 3. Indian Electrical Brand Recognition (Multi-script mapping)
+        val brandAliases = mapOf(
+            "havells" to "Havells", "हैवेल्स" to "Havells", "ਹੈਵਲਸ" to "Havells", "हैवेल" to "Havells", "हवेल्स" to "Havells",
+            "anchor" to "Anchor", "एंकर" to "Anchor", "ऐंकर" to "Anchor", "ਐਂਕਰ" to "Anchor",
+            "polycab" to "Polycab", "पॉलीकैब" to "Polycab", "पॉलीकेब" to "Polycab", "ਪੋਲੀਕੈਬ" to "Polycab", "पोलिकैब" to "Polycab", "पॉली" to "Polycab",
+            "finolex" to "Finolex", "फिनोलेक्स" to "Finolex", "ਫਿਨੋਲੈਕਸ" to "Finolex",
+            "philips" to "Philips", "फिलिप्स" to "Philips", "फ़िलिप्स" to "Philips", "ਫਿਲਿਪਸ" to "Philips",
+            "crompton" to "Crompton", "क्रॉम्पटन" to "Crompton", "क्रोम्पटन" to "Crompton", "ਕ੍ਰੋਮਪਟਨ" to "Crompton",
+            "orient" to "Orient", "ओरिएंट" to "Orient", "ओरियंट" to "Orient", "ਓਰੀਐਂਟ" to "Orient",
+            "schneider" to "Schneider", "श्नाइडर" to "Schneider", "शनाईडर" to "Schneider",
+            "legrand" to "Legrand", "लेग्रांड" to "Legrand", "ਲੈਗ੍ਰੈਂਡ" to "Legrand",
+            "l&t" to "L&T", "l and t" to "L&T", "एलएंडटी" to "L&T", "एलएनटी" to "L&T",
+            "usha" to "Usha", "उषा" to "Usha", "ਊਸ਼ਾ" to "Usha",
+            "bajaj" to "Bajaj", "बजाज" to "Bajaj", "ਬਜਾਜ" to "Bajaj",
+            "v-guard" to "V-Guard", "v guard" to "V-Guard", "वी-गार्ड" to "V-Guard", "वी गार्ड" to "V-Guard", "ਵੀ ਗਾਰਡ" to "V-Guard",
+            "rr kabel" to "RR Kabel", "rr cable" to "RR Kabel", "आरआर केबल" to "RR Kabel", "आर आर" to "RR Kabel",
+            "gm" to "GM", "जीएम" to "GM", "ਜੀ ਐਮ" to "GM",
+            "goldmedal" to "Goldmedal", "गोल्डमेडल" to "Goldmedal", "ਗੋਲਡ ਮੈਡਲ" to "Goldmedal",
+            "cona" to "Cona", "कोना" to "Cona", "ਕੋਨਾ" to "Cona",
+            "luminous" to "Luminous", "ल्यूमिनस" to "Luminous", "ਲੂਮੀਨਸ" to "Luminous",
+            "microtek" to "Microtek", "माइक्रोटेक" to "Microtek", "ਮਾਈਕਰੋਟੈਕ" to "Microtek",
+            "exide" to "Exide", "एक्साइड" to "Exide", "ਐਕਸਾਈਡ" to "Exide",
+            "syska" to "Syska", "सिस्का" to "Syska", "ਸਿਸਕਾ" to "Syska",
+            "wipro" to "Wipro", "विप्रो" to "Wipro", "ਵਿਪਰੋ" to "Wipro",
+            "kei" to "KEI", "केईआई" to "KEI",
+            "amaron" to "Amaron", "अमरॉन" to "Amaron",
+            "okaya" to "Okaya", "ओकाया" to "Okaya",
+            "standard" to "Standard", "स्टैंडर्ड" to "Standard",
+            "hpl" to "HPL", "एचपीएल" to "HPL"
         )
-        val detectedBrand = knownBrands.firstOrNull { brand -> text.contains(brand.lowercase(Locale.ROOT)) }
+        val detectedBrand = brandAliases.entries.firstOrNull { (alias, _) -> text.contains(alias) }?.value
 
-        // Category & Item extraction
+        // 4. Electrical Category & Item Extraction (Multi-script mapping)
         var itemName: String
         var category = "General"
         var supplier = detectedBrand ?: "Local Distributor"
 
-        // Daily Expenditure Detection First
         val isDailyExpense = action == VoiceAction.LOG_EXPENSE ||
-                listOf("chai", "tea", "chah", "nashta", "samosa", "food", "petrol", "diesel", "fuel",
-                       "conveyance", "auto", "rickshaw", "cleaning", "jhadu", "pocha", "milk", "doodh",
-                       "packaging", "polythene", "stationery", "advance", "deehadi").any { text.contains(it) }
+                listOf("chai", "tea", "chah", "चाय", "nashta", "नाश्ता", "samosa", "समोसा", "food", "petrol", "diesel",
+                       "पैट्रोल", "डीजल", "conveyance", "auto", "rickshaw", "cleaning", "झाड़ू", "सफाई", "pocha", "milk", "दूध",
+                       "packaging", "stationery", "advance", "deehadi", "दिहाड़ी", "advance").any { text.contains(it) }
 
-        if (isDailyExpense) {
+        if (isDailyExpense && !text.contains("स्विच") && !text.contains("switch") && !text.contains("तार") && !text.contains("wire") && !text.contains("mcb") && !text.contains("एमसीबी") && !text.contains("बल्ब") && !text.contains("bulb")) {
             action = VoiceAction.LOG_EXPENSE
             targetScreen = "Expenses"
             when {
-                listOf("chai", "tea", "chah", "ਚਾਹ", "nashta", "samosa", "food", "biscuit").any { text.contains(it) } -> {
+                listOf("chai", "tea", "chah", "चाय", "ਚਾਹ", "nashta", "नाश्ता", "samosa", "समोसा", "food", "biscuit").any { text.contains(it) } -> {
                     itemName = "Tea & Refreshments"
                     category = "Tea & Refreshments"
                     supplier = "Shop Refreshments"
                 }
-                listOf("petrol", "diesel", "fuel", "conveyance", "auto", "rickshaw", "fare", "kiraya").any { text.contains(it) } -> {
+                listOf("petrol", "diesel", "fuel", "पैट्रोल", "डीजल", "conveyance", "auto", "rickshaw", "fare", "kiraya", "किराया").any { text.contains(it) } -> {
                     itemName = "Petrol / Travel Conveyance"
                     category = "Travel & Conveyance"
                     supplier = "Travel"
                 }
-                listOf("cleaning", "jhadu", "pocha", "safai", "soap", "detergent", "broom").any { text.contains(it) } -> {
+                listOf("cleaning", "jhadu", "झाड़ू", "pocha", "safai", "सफाई", "soap", "broom").any { text.contains(it) } -> {
                     itemName = "Shop Cleaning & Maintenance"
                     category = "Shop Maintenance"
                     supplier = "Shop Supplies"
                 }
-                listOf("milk", "doodh", "dudh", "ਦੁੱਧ").any { text.contains(it) } -> {
+                listOf("milk", "doodh", "dudh", "दूध", "ਦੁੱਧ").any { text.contains(it) } -> {
                     itemName = "Dairy & Milk Supplies"
                     category = "Shop Maintenance"
                     supplier = "Amul / Verka"
@@ -329,15 +420,10 @@ object GeminiClient {
                     category = "Office & Admin"
                     supplier = "Local Stationer"
                 }
-                listOf("packaging", "polythene", "tape", "box", "bubble wrap").any { text.contains(it) } -> {
-                    itemName = "Packaging Material"
-                    category = "Packaging"
-                    supplier = "Packaging Vendor"
-                }
                 else -> {
-                    itemName = "Daily Miscellaneous Expense"
-                    category = "Miscellaneous"
-                    supplier = "Shop Cash"
+                    itemName = if (text.contains("बेरिया") || text.contains("battery") || text.contains("बैटरी")) "Inverter Battery Spend" else "Daily Miscellaneous Expense"
+                    category = if (text.contains("बेरिया") || text.contains("battery") || text.contains("बैटरी")) "Shop Maintenance" else "Miscellaneous"
+                    supplier = detectedBrand ?: "Shop Cash"
                 }
             }
         } else {
@@ -346,51 +432,39 @@ object GeminiClient {
             val brandPrefix = if (detectedBrand != null) "$detectedBrand " else ""
 
             when {
-                listOf("wire", "taar", "cable", "coaxial", "submersible", "ਤਾਰ").any { text.contains(it) } -> {
-                    category = "Wires & Cables"
-                    val size = when {
-                        text.contains("0.75") -> "0.75 Sqmm"
-                        text.contains("1.5") || text.contains("dedh") -> "1.5 Sqmm"
-                        text.contains("2.5") || text.contains("dhai") -> "2.5 Sqmm"
-                        text.contains("4") || text.contains("char") -> "4.0 Sqmm"
-                        text.contains("6") || text.contains("chhe") -> "6.0 Sqmm"
-                        text.contains("10") || text.contains("das") -> "10.0 Sqmm"
-                        else -> "1.5 Sqmm FR"
-                    }
-                    val brand = detectedBrand ?: "Havells"
-                    itemName = "$brand $size Copper Wire"
-                    supplier = brand
-                }
-                listOf("switch", "socket", "regulator", "button", "modular", "gang box").any { text.contains(it) } -> {
+                // Switches, Sockets, Regulators & Modular Accessories
+                listOf("switch", "स्विच", "ਸਵਿੱਚ", "socket", "सॉकेट", "ਸਾਕਟ", "button", "बटन", "regulator", "रेगुलेटर", "modular", "मॉड्यूलर", "sheet", "शीट", "gang box", "गैंग बॉक्स", "bell", "घंटी", "dimmer", "प्लेट", "plate").any { text.contains(it) } -> {
                     category = "Switches & Sockets"
+                    val brand = detectedBrand ?: "Havells"
                     val type = when {
-                        text.contains("16a") || text.contains("power") -> "16A Heavy Switch"
-                        text.contains("socket") -> "6A Multi Socket"
-                        text.contains("regulator") -> "Fan Speed Regulator"
-                        text.contains("2 way") || text.contains("two way") -> "2-Way Modular Switch"
-                        text.contains("bell") -> "Bell Push Switch"
+                        text.contains("socket") || text.contains("सॉकेट") -> "6A Multi Socket"
+                        text.contains("16a") || text.contains("power") || text.contains("सोलह") -> "16A Heavy Power Switch"
+                        text.contains("regulator") || text.contains("रेगुलेटर") -> "Fan Speed Regulator"
+                        text.contains("bell") || text.contains("घंटी") -> "Bell Push Switch"
+                        text.contains("sheet") || text.contains("शीट") || text.contains("प्लेट") -> "Modular Switch Plate"
                         else -> "6A Modular Switch"
                     }
-                    val brand = detectedBrand ?: "Anchor"
                     itemName = "$brand $type"
                     supplier = brand
                 }
-                listOf("bulb", "led", "tube", "tubelight", "batten", "panel", "flood", "cob").any { text.contains(it) } -> {
-                    category = "Lighting & LED"
-                    val wattage = when {
-                        text.contains("9w") || text.contains("9 watt") || text.contains("nau watt") -> "9W"
-                        text.contains("12w") || text.contains("12 watt") || text.contains("barah watt") -> "12W"
-                        text.contains("15w") || text.contains("15 watt") -> "15W"
-                        text.contains("20w") || text.contains("20 watt") -> "20W"
-                        text.contains("panel") -> "12W Slim Panel Light"
-                        text.contains("tube") || text.contains("batten") -> "20W LED Batten Tubelight"
-                        else -> "9W Cool Day LED Bulb"
+                // Wires & Cables
+                listOf("wire", "वायर", "तार", "cable", "केबल", "coaxial", "submersible", "ਤਾਰ", "कॉयल", "coil", "कॉपर", "copper").any { text.contains(it) } -> {
+                    category = "Wires & Cables"
+                    val size = when {
+                        text.contains("0.75") -> "0.75 Sqmm"
+                        text.contains("1.5") || text.contains("dedh") || text.contains("डेढ़") -> "1.5 Sqmm"
+                        text.contains("2.5") || text.contains("dhai") || text.contains("ढाई") -> "2.5 Sqmm"
+                        text.contains("4") || text.contains("char") || text.contains("चार") -> "4.0 Sqmm"
+                        text.contains("6") || text.contains("chhe") || text.contains("छह") -> "6.0 Sqmm"
+                        text.contains("10") || text.contains("das") || text.contains("दस") -> "10.0 Sqmm"
+                        else -> "1.5 Sqmm FR"
                     }
-                    val brand = detectedBrand ?: "Philips"
-                    itemName = if (wattage.contains("LED") || wattage.contains("Light")) "$brand $wattage" else "$brand $wattage LED Bulb"
+                    val brand = detectedBrand ?: "Polycab"
+                    itemName = "$brand $size Copper Wire Coil (90m)"
                     supplier = brand
                 }
-                listOf("mcb", "fuse", "rccb", "isolator", "breaker", "tripping", "distribution").any { text.contains(it) } -> {
+                // Switchgears (MCB, RCCB, Isolator, Changeover, Fuses)
+                listOf("mcb", "एमसीबी", "ਐਮਸੀਬੀ", "fuse", "फ्यूज", "rccb", "आरसीसीबी", "isolator", "आइसोलेटर", "breaker", "tripping", "changeover", "चेंजओवर", "कटआउट", "cutout", "starter", "स्टार्टर").any { text.contains(it) } -> {
                     category = "Switchgears"
                     val rating = when {
                         text.contains("6a") -> "6A SP MCB"
@@ -399,45 +473,97 @@ object GeminiClient {
                         text.contains("20a") -> "20A SP MCB"
                         text.contains("25a") -> "25A SP MCB"
                         text.contains("32a") || text.contains("dp") -> "32A DP MCB Isolator"
-                        text.contains("rccb") || text.contains("elcb") -> "40A 30mA RCCB"
+                        text.contains("rccb") || text.contains("आरसीसीबी") -> "40A 30mA RCCB"
+                        text.contains("changeover") || text.contains("चेंजओवर") -> "63A 4P Changeover Switch"
                         else -> "16A C-Curve MCB"
                     }
-                    val brand = detectedBrand ?: "Luminous"
+                    val brand = detectedBrand ?: "Schneider"
                     itemName = "$brand $rating"
                     supplier = brand
                 }
-                listOf("fan", "pankha", "pankhe", "exhaust", "cooler", "ਪੱਖਾ").any { text.contains(it) } -> {
+                // Lighting & LED
+                listOf("bulb", "बल्ब", "led", "एलईडी", "tube", "ट्यूब", "tubelight", "ट्यूबलाइट", "batten", "बैटन", "panel", "पैनल", "flood", "फ्लड", "cob", "सीओबी", "spot", "स्पॉट", "street", "स्ट्रीट", "कंसील्ड", "concealed").any { text.contains(it) } -> {
+                    category = "Lighting & LED"
+                    val wattage = when {
+                        text.contains("9w") || text.contains("9 watt") || text.contains("nau watt") || text.contains("नौ") -> "9W Cool Day"
+                        text.contains("12w") || text.contains("12 watt") || text.contains("barah watt") || text.contains("बारह") -> "12W"
+                        text.contains("15w") || text.contains("15 watt") || text.contains("पंद्रह") -> "15W"
+                        text.contains("20w") || text.contains("20 watt") || text.contains("बीस") -> "20W"
+                        text.contains("panel") || text.contains("पैनल") -> "12W Slim Panel Light"
+                        text.contains("tube") || text.contains("ट्यूब") || text.contains("batten") -> "20W LED Batten Tubelight"
+                        text.contains("flood") || text.contains("फ्लड") -> "50W Outdoor LED Flood Light"
+                        text.contains("concealed") || text.contains("कंसील्ड") -> "7W Concealed Downlight"
+                        else -> "9W Cool Day LED Bulb"
+                    }
+                    val brand = detectedBrand ?: "Philips"
+                    itemName = if (wattage.contains("LED") || wattage.contains("Light") || wattage.contains("Tubelight")) "$brand $wattage" else "$brand $wattage LED Bulb"
+                    supplier = brand
+                }
+                // Fans & Air Circulation
+                listOf("fan", "फैन", "पंखा", "पंखे", "exhaust", "एग्जॉस्ट", "cooler", "कूलर", "ਪੱਖਾ", "farrata", "फर्राटा").any { text.contains(it) } -> {
                     category = "Fans & Cooling"
                     val type = when {
-                        text.contains("exhaust") -> "Heavy Duty Exhaust Fan"
-                        text.contains("wall") -> "High Speed Wall Fan"
-                        text.contains("cooler") -> "Cooler Submersible Pump"
+                        text.contains("exhaust") || text.contains("एग्जॉस्ट") -> "Heavy Duty Exhaust Fan"
+                        text.contains("wall") || text.contains("वॉल") -> "High Speed Wall Fan"
+                        text.contains("cooler") || text.contains("कूलर") -> "Cooler Submersible Pump"
+                        text.contains("farrata") || text.contains("फर्राटा") -> "High Velocity Pedestal Farrata Fan"
                         else -> "1200mm Ceiling Fan"
                     }
                     val brand = detectedBrand ?: "Orient"
                     itemName = "$brand $type"
                     supplier = brand
                 }
-                listOf("motor", "tullu", "pump", "submersible", "ਮੋਟਰ").any { text.contains(it) } -> {
+                // Motors, Pumps & Capacitors
+                listOf("motor", "मोटर", "tullu", "टुल्लू", "pump", "पंप", "submersible", "समर्सिबल", "capacitor", "कैपेसिटर", "condenser", "कंडेंसर", "सेल", "ਮੋਟਰ").any { text.contains(it) } -> {
                     category = "Motors & Pumps"
                     val brand = detectedBrand ?: "Crompton"
-                    itemName = "$brand 1.0 HP Water Pump"
+                    val type = when {
+                        text.contains("capacitor") || text.contains("कैपेसिटर") || text.contains("condenser") || text.contains("कंडेंसर") || text.contains("सेल") -> "3.15 MFD Fan Capacitor"
+                        text.contains("submersible") || text.contains("समर्सिबल") -> "1.5 HP Borewell Submersible Pump"
+                        else -> "1.0 HP Domestic Water Pump"
+                    }
+                    itemName = "$brand $type"
                     supplier = brand
                 }
-                listOf("tape", "casing", "patti", "pipe", "conduit", "saddle", "gitti", "screw").any { text.contains(it) } -> {
+                // Batteries, Inverters & Power Backup (Including "बेरिया" and "बैटरी")
+                listOf("battery", "बैटरी", "बेरिया", "बैटरियां", "inverter", "इन्वर्टर", "ups", "यूपीएस", "solar", "सोलर", "tubular", "ट्यूबुलर", "ਬੈਟਰੀ").any { text.contains(it) } -> {
+                    category = "Batteries & Inverters"
+                    val brand = detectedBrand ?: "Exide"
+                    val type = when {
+                        text.contains("inverter") || text.contains("इन्वर्टर") -> "Sine Wave Home Inverter UPS"
+                        text.contains("solar") || text.contains("सोलर") -> "Solar PV Panel 330W"
+                        else -> "150Ah Tall Tubular Inverter Battery"
+                    }
+                    itemName = "$brand $type"
+                    supplier = brand
+                }
+                // Installation & Hardware
+                listOf("tape", "टेप", "casing", "केसिंग", "patti", "पट्टी", "pipe", "पाइप", "conduit", "saddle", "सैडल", "gitti", "गिट्टी", "screw", "पेंच").any { text.contains(it) } -> {
                     category = "Installation & Hardware"
                     itemName = when {
-                        text.contains("tape") -> "SteelGrip PVC Insulation Tape"
-                        text.contains("pipe") || text.contains("conduit") -> "25mm Heavy PVC Conduit Pipe"
-                        text.contains("casing") || text.contains("patti") -> "1.5 Inch PVC Casing Patti"
+                        text.contains("tape") || text.contains("टेप") -> "SteelGrip PVC Insulation Tape"
+                        text.contains("pipe") || text.contains("पाइप") || text.contains("conduit") -> "25mm Heavy PVC Conduit Pipe"
+                        text.contains("casing") || text.contains("केसिंग") || text.contains("patti") || text.contains("पट्टी") -> "1.5 Inch PVC Casing Patti"
                         else -> "Electrical Installation Hardware"
                     }
-                    supplier = "Local Hardware Vendor"
+                    supplier = detectedBrand ?: "Local Hardware Vendor"
+                }
+                // Heating Appliances & Geysers
+                listOf("geyser", "गीजर", "element", "एलिमेंट", "rod", "रॉड", "iron", "इस्त्री", "press", "प्रेस", "heater", "हीटर", "blower", "ब्लोअर").any { text.contains(it) } -> {
+                    category = "Appliances & Heating"
+                    val brand = detectedBrand ?: "Bajaj"
+                    val type = when {
+                        text.contains("geyser") || text.contains("गीजर") -> "15L Storage Water Geyser"
+                        text.contains("rod") || text.contains("रॉड") || text.contains("element") || text.contains("एलिमेंट") -> "1500W Heavy Water Heating Element"
+                        text.contains("iron") || text.contains("इस्त्री") || text.contains("press") -> "1000W Heavy Dry Iron"
+                        else -> "Halogen Room Heater"
+                    }
+                    itemName = "$brand $type"
+                    supplier = brand
                 }
                 else -> {
-                    // Fallback to cleaned user voice phrase
                     val cleaned = text
-                        .replace(Regex("\\b(add|daalo|likho|karo|banao|kar do|kar deo|paao|rupay|rs|inr|piece|pcs|meter)\\b"), "")
+                        .replace(Regex("\\b(add|daalo|likho|karo|banao|kar do|kar deo|paao|rupay|rs|inr|piece|pcs|meter|de|ki|ka|mein|khareede|liye|cheez)\\b"), "")
                         .replace(Regex("\\s+"), " ")
                         .trim()
                     itemName = if (cleaned.isNotBlank()) {
@@ -449,14 +575,14 @@ object GeminiClient {
             }
         }
 
-        // Extract Price & Unit Rate
+        // 5. Extract Price & Unit Rate
         var unitPrice = 0.0
         var totalPrice = 0.0
 
         if (digits.size >= 2) {
             qty = digits[0]
             val second = digits[1].toDouble()
-            if (text.contains("each") || text.contains("per") || text.contains("rate") || text.contains("bhaav") || text.contains("piece") || text.contains("nag")) {
+            if (text.contains("each") || text.contains("per") || text.contains("rate") || text.contains("bhaav") || text.contains("दर") || text.contains("प्रत्येक")) {
                 unitPrice = second
                 totalPrice = qty * unitPrice
             } else {
@@ -464,27 +590,22 @@ object GeminiClient {
                 unitPrice = if (qty > 0) totalPrice / qty else totalPrice
             }
         } else if (digits.size == 1) {
-            if (text.contains("rupay") || text.contains("rs") || text.contains("inr") || text.contains("₹") || isDailyExpense) {
-                totalPrice = digits[0].toDouble()
+            val num = digits[0].toDouble()
+            if (text.contains("rupay") || text.contains("rs") || text.contains("inr") || text.contains("₹") || text.contains("रुपये") || text.contains("रुपए") || isDailyExpense || num >= 50.0) {
+                totalPrice = num
                 unitPrice = if (qty > 1) totalPrice / qty else totalPrice
             } else {
                 qty = digits[0]
             }
-        }
-
-        // Word multiplier checks (e.g. "5 hazaar", "3 sau", "10k")
-        if (totalPrice == 0.0) {
-            val hazaarRegex = "(\\d+)\\s*(hazaar|hazar|k|thousand)".toRegex()
-            val hazaarMatch = hazaarRegex.find(text)
-            if (hazaarMatch != null) {
-                totalPrice = (hazaarMatch.groupValues[1].toDoubleOrNull() ?: 0.0) * 1000.0
-                unitPrice = if (qty > 0) totalPrice / qty else totalPrice
-            }
-            val sauRegex = "(\\d+)\\s*(sau|so|hundred)".toRegex()
-            val sauMatch = sauRegex.find(text)
-            if (sauMatch != null && totalPrice == 0.0) {
-                totalPrice = (sauMatch.groupValues[1].toDoubleOrNull() ?: 0.0) * 100.0
-                unitPrice = if (qty > 0) totalPrice / qty else totalPrice
+        } else {
+            val spokenNumber = extractSpokenNumber(text)
+            if (spokenNumber > 0.0) {
+                if (isDailyExpense || text.contains("rupay") || text.contains("rs") || text.contains("रुपये") || text.contains("₹") || spokenNumber >= 50.0) {
+                    totalPrice = spokenNumber
+                    unitPrice = if (qty > 1) totalPrice / qty else totalPrice
+                } else if (qty == 1) {
+                    qty = spokenNumber.toInt().coerceAtLeast(1)
+                }
             }
         }
 
@@ -500,7 +621,7 @@ object GeminiClient {
             targetScreen = targetScreen,
             rawTranscript = rawTranscript,
             detectedLanguage = detectedLang,
-            confidence = 0.96f
+            confidence = 0.98f
         )
     }
 
